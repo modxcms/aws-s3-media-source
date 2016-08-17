@@ -46,14 +46,19 @@ class AwsS3MediaSource extends modMediaSource implements modMediaSourceInterface
         $this->xpdo->lexicon->load('core:source');
         $this->properties = $this->getPropertyList();
 
-        $this->driver = new S3Client([
-            'version' => 'latest',
-            'region' => $this->xpdo->getOption('region', $this->properties, ''),
-            'credentials' => [
-                'key' => $this->xpdo->getOption('key', $this->properties, ''),
-                'secret' => $this->xpdo->getOption('secret_key', $this->properties, '')
-            ]
-        ]);
+        try {
+            $this->driver = new S3Client([
+                'version' => 'latest',
+                'region' => $this->xpdo->getOption('region', $this->properties, ''),
+                'credentials' => [
+                    'key' => $this->xpdo->getOption('key', $this->properties, ''),
+                    'secret' => $this->xpdo->getOption('secret_key', $this->properties, '')
+                ]
+            ]);
+        } catch (Exception $e) {
+            $this->xpdo->log(xPDO::LOG_LEVEL_ERROR, '[AWS S3 MS] ' . $e->getMessage());
+            return false;
+        }
 
         $this->bucket = $this->xpdo->getOption('bucket', $this->properties, '');
 
@@ -194,11 +199,16 @@ class AwsS3MediaSource extends modMediaSource implements modMediaSourceInterface
             $c['prefix'] = $dir;
         }
 
-        $result = $this->driver->listObjects([
-            'Bucket' => $this->bucket,
-            'Prefix' => ltrim($dir, '/'),
-            'Delimiter' => '/'
-        ]);
+        try {
+            $result = $this->driver->listObjects([
+                'Bucket' => $this->bucket,
+                'Prefix' => ltrim($dir, '/'),
+                'Delimiter' => '/'
+            ]);
+        } catch (Exception $e) {
+            $this->xpdo->log(xPDO::LOG_LEVEL_ERROR, '[AWS S3 MS] ' . $e->getMessage());
+            return [[], []];
+        }
 
         $directories = [];
         $files = [];
@@ -502,13 +512,14 @@ class AwsS3MediaSource extends modMediaSource implements modMediaSourceInterface
     {
         $newPath = ltrim($parentContainer . rtrim($name, '/') . '/', '/');
 
-        $exists = $this->driver->doesObjectExist($this->bucket, $newPath);
-        if ($exists) {
-            $this->addError('file', $this->xpdo->lexicon('file_folder_err_ae') . ': ' . $newPath);
-            return false;
-        }
-
         try {
+            $exists = $this->driver->doesObjectExist($this->bucket, $newPath);
+            if ($exists) {
+                $this->addError('file', $this->xpdo->lexicon('file_folder_err_ae') . ': ' . $newPath);
+                return false;
+            }
+
+        
             $this->driver->putObject([
                 'Bucket' => $this->bucket,
                 'Key' => $newPath,
@@ -552,12 +563,12 @@ class AwsS3MediaSource extends modMediaSource implements modMediaSourceInterface
     {
         $path = trim($path, '/');
 
-        if (!$this->driver->doesObjectExist($this->bucket, $path)) {
-            $this->addError('file', $this->xpdo->lexicon('file_folder_err_ns') . ': ' . $path);
-            return false;
-        }
-
         try {
+            if (!$this->driver->doesObjectExist($this->bucket, $path)) {
+                $this->addError('file', $this->xpdo->lexicon('file_folder_err_ns') . ': ' . $path);
+                return false;
+            }
+        
             $this->driver->deleteMatchingObjects($this->bucket, $path);
         } catch (Exception $e) {
             $this->xpdo->log(xPDO::LOG_LEVEL_ERROR, '[AWS S3 MS] Error occurred when deleting container: ' . $e->getMessage());
@@ -840,11 +851,13 @@ class AwsS3MediaSource extends modMediaSource implements modMediaSourceInterface
             'z' => 'application/x-compress',
             'zip' => 'application/zip'
         );
+        
         if (isset($mimeTypes[strtolower($ext)])) {
             $contentType = $mimeTypes[strtolower($ext)];
         } else {
             $contentType = 'octet/application-stream';
         }
+        
         return $contentType;
     }
 
@@ -861,13 +874,13 @@ class AwsS3MediaSource extends modMediaSource implements modMediaSourceInterface
     {
         $key = $path . $name;
 
-        $exists = $this->driver->doesObjectExist($this->bucket, $key);
-        if ($exists) {
-            $this->addError('file', $this->xpdo->lexicon('file_folder_err_ae') . ': ' . $key);
-            return false;
-        }
-
         try {
+            $exists = $this->driver->doesObjectExist($this->bucket, $key);
+            if ($exists) {
+                $this->addError('file', $this->xpdo->lexicon('file_folder_err_ae') . ': ' . $key);
+                return false;
+            }
+        
             $this->driver->putObject([
                 'Bucket' => $this->bucket,
                 'Key' => $key,
@@ -926,16 +939,16 @@ class AwsS3MediaSource extends modMediaSource implements modMediaSourceInterface
      */
     public function renameObject($oldPath, $newName)
     {
-        $exists = $this->driver->doesObjectExist($this->bucket, $oldPath);
-        if (!$exists) {
-            $this->addError('file', $this->xpdo->lexicon('file_folder_err_ns') . ': ' . $oldPath);
-            return false;
-        }
-
-        $dir = dirname($oldPath);
-        $newPath = ($dir != '.' ? $dir . '/' : '') . $newName;
-
         try {
+            $exists = $this->driver->doesObjectExist($this->bucket, $oldPath);
+            if (!$exists) {
+                $this->addError('file', $this->xpdo->lexicon('file_folder_err_ns') . ': ' . $oldPath);
+                return false;
+            }
+    
+            $dir = dirname($oldPath);
+            $newPath = ($dir != '.' ? $dir . '/' : '') . $newName;
+        
             $this->driver->copyObject([
                 'ACL' => 'public-read',
                 'Bucket' => $this->bucket,
@@ -979,34 +992,34 @@ class AwsS3MediaSource extends modMediaSource implements modMediaSourceInterface
             return false;
         }
 
-        $existsFrom = $this->driver->doesObjectExist($this->bucket, $from);
-        if (!$existsFrom) {
-            $this->xpdo->error->message = $this->xpdo->lexicon('file_err_ns') . ': ' . $from;
-
-            return false;
-        }
-
-        if ($to != '/') {
-            $existsTo = $this->driver->doesObjectExist($this->bucket, $to);
-            if (!$existsTo) {
-                $this->xpdo->error->message = $this->xpdo->lexicon('file_err_ns') . ': ' . $to;
-
+        try {
+            $existsFrom = $this->driver->doesObjectExist($this->bucket, $from);
+            if (!$existsFrom) {
+                $this->xpdo->error->message = $this->xpdo->lexicon('file_err_ns') . ': ' . $from;
+    
                 return false;
             }
-
-            if ($point != 'append') {
-                $dir = dirname(rtrim($to, '/'));
-                $dir = ($dir == '.') ? '' : $dir . '/';
-
-                $toPath = $dir . basename($from);
+    
+            if ($to != '/') {
+                $existsTo = $this->driver->doesObjectExist($this->bucket, $to);
+                if (!$existsTo) {
+                    $this->xpdo->error->message = $this->xpdo->lexicon('file_err_ns') . ': ' . $to;
+    
+                    return false;
+                }
+    
+                if ($point != 'append') {
+                    $dir = dirname(rtrim($to, '/'));
+                    $dir = ($dir == '.') ? '' : $dir . '/';
+    
+                    $toPath = $dir . basename($from);
+                } else {
+                    $toPath = rtrim($to, '/') . '/' . basename($from);
+                }
             } else {
-                $toPath = rtrim($to, '/') . '/' . basename($from);
+                $toPath = basename($from);
             }
-        } else {
-            $toPath = basename($from);
-        }
-
-        try {
+        
             $this->driver->copyObject([
                 'ACL' => 'public-read',
                 'Bucket' => $this->bucket,
@@ -1036,13 +1049,13 @@ class AwsS3MediaSource extends modMediaSource implements modMediaSourceInterface
      */
     public function removeObject($path)
     {
-        $exists = $this->driver->doesObjectExist($this->bucket, $path);
-        if (!$exists) {
-            $this->addError('file', $this->xpdo->lexicon('file_folder_err_ns') . ': ' . $path);
-            return false;
-        }
-
         try {
+            $exists = $this->driver->doesObjectExist($this->bucket, $path);
+            if (!$exists) {
+                $this->addError('file', $this->xpdo->lexicon('file_folder_err_ns') . ': ' . $path);
+                return false;
+            }
+        
             $this->driver->deleteObject([
                 'Bucket' => $this->bucket,
                 'Key' => $path
