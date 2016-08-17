@@ -1,14 +1,12 @@
 <?php
 
-use Aws\S3\S3Client;
-
 if (!class_exists('modMediaSource')) {
     require MODX_CORE_PATH . 'model/modx/sources/modmediasource.class.php';
 }
 
 class AwsS3MediaSource extends modMediaSource implements modMediaSourceInterface
 {
-    /** @var S3Client */
+    /** @var Aws\S3\S3Client */
     protected $driver;
 
     /** @var string */
@@ -47,7 +45,7 @@ class AwsS3MediaSource extends modMediaSource implements modMediaSourceInterface
         $this->properties = $this->getPropertyList();
 
         try {
-            $this->driver = new S3Client([
+            $this->driver = new Aws\S3\S3Client([
                 'version' => 'latest',
                 'region' => $this->xpdo->getOption('region', $this->properties, ''),
                 'credentials' => [
