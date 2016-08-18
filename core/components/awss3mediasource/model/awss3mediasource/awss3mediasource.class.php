@@ -1124,6 +1124,14 @@ class AwsS3MediaSource extends modMediaSource implements modMediaSourceInterface
                 'value' => 'http://mysite.s3.amazonaws.com/',
                 'lexicon' => 'core:source',
             ),
+            'region' => array(
+                'name' => 'region',
+                'desc' => 'prop_s3.region_desc',
+                'type' => 'textfield',
+                'options' => '',
+                'value' => '',
+                'lexicon' => 'core:source',
+            ),
             'bucket' => array(
                 'name' => 'bucket',
                 'desc' => 'prop_s3.bucket_desc',
@@ -1181,14 +1189,6 @@ class AwsS3MediaSource extends modMediaSource implements modMediaSourceInterface
                 'type' => 'textfield',
                 'options' => '',
                 'value' => '.svn,.git,_notes,nbproject,.idea,.DS_Store',
-                'lexicon' => 'core:source',
-            ),
-            'region' => array(
-                'name' => 'region',
-                'desc' => 'prop_s3.region_desc',
-                'type' => 'textfield',
-                'options' => '',
-                'value' => '',
                 'lexicon' => 'core:source',
             ),
         );
