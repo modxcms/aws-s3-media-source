@@ -1,4 +1,7 @@
 
+### 0.9.2
+- Remove use statement
+
 ### 0.9.1
 - Error Logging
 
