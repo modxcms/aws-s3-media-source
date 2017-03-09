@@ -559,7 +559,10 @@ class AwsS3MediaSource extends modMediaSource implements modMediaSourceInterface
      */
     public function removeContainer($path)
     {
-        $path = trim($path, '/');
+        /**
+         * Need the trailing delimiter
+         */
+        $path = trim($this->cleanKey($path), '/').'/';
 
         try {
             if (!$this->driver->doesObjectExist($this->bucket, $path)) {
@@ -1039,6 +1042,22 @@ class AwsS3MediaSource extends modMediaSource implements modMediaSourceInterface
     }
 
     /**
+     * @param string $path
+     *
+     * @return string $path
+     */
+    protected function cleanKey($path)
+    {
+        /**
+         * Files need only the Key which appears to be the relative path.
+         * So the URL property that MODX adds to the passed parameter needs to be removed.
+         *
+         * http://docs.aws.amazon.com/AmazonS3/latest/dev/UsingMetadata.html#object-keys
+         */
+        $path = str_replace($this->getOption('url', $this->properties, ''), '', $path);
+        return $path;
+    }
+    /**
      * Delete a file
      *
      * @param string $path
@@ -1047,6 +1066,7 @@ class AwsS3MediaSource extends modMediaSource implements modMediaSourceInterface
      */
     public function removeObject($path)
     {
+        $path = $this->cleanKey($path);
         try {
             $exists = $this->driver->doesObjectExist($this->bucket, $path);
             if (!$exists) {
