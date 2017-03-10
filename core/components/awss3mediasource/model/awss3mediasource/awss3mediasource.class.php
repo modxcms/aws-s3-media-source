@@ -582,9 +582,6 @@ class AwsS3MediaSource extends modMediaSource implements modMediaSourceInterface
                 $this->addError('file', $this->xpdo->lexicon('file_folder_err_ns') . ': ' . $oldPath);
                 return false;
             }
-            $this->xpdo->log(xPDO::LOG_LEVEL_ERROR, PHP_EOL.'        [AWS S3 MS] RENAME: '.$source_key.' New: ' . $new_key.'');
-            //return false;
-            // Instantiate the client. $s3 = Aws\S3\S3Client::factory();
             $use_batch = false;
             // Copy the main object, single:
             if ( $use_batch ) {
@@ -1124,8 +1121,6 @@ class AwsS3MediaSource extends modMediaSource implements modMediaSourceInterface
      */
     public function moveObject($from, $to, $point = 'append')
     {
-        $e = new Exception();
-        $this->xpdo->log(xPDO::LOG_LEVEL_ERROR, '[AWS S3 MS] moveObject() from: '.$from.' to: '.$to . $e->getTraceAsString());
         // Does the file/folder to be moved exist?
         $existsFrom = $this->driver->doesObjectExist($this->bucket, $from);
         if (!$existsFrom) {
