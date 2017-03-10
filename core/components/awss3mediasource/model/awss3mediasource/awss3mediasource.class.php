@@ -118,8 +118,13 @@ class AwsS3MediaSource extends modMediaSource implements modMediaSourceInterface
             $fileName = basename($currentPath);
             $dirNames[] = strtoupper($fileName);
 
+            $text = $fileName;
+            if ($this->getOption('allowFolderCopy', $this->properties, false)) {
+                $text = substr($currentPath, 0, strlen($currentPath) - (strlen($fileName)+1)).$fileName;
+            }
             $directories[$currentPath] = array(
                 'id' => $currentPath,
+                //'text' => '<span style="display:none;">'.substr($currentPath, 0, strlen($currentPath) - (strlen($fileName)+1)).'</span>'.$fileName,
                 'text' => $fileName,
                 'cls' => 'folder',
                 'iconCls' => 'icon icon-folder',
@@ -218,13 +223,17 @@ class AwsS3MediaSource extends modMediaSource implements modMediaSourceInterface
         $files = [];
 
         $prefixes = $result->get('CommonPrefixes');
-        foreach ($prefixes as $folder) {
-            $directories[] = $folder['Prefix'];
+        if ( is_array($prefixes) ) {
+            foreach ($prefixes as $folder) {
+                $directories[] = $folder['Prefix'];
+            }
         }
 
         $contents = $result->get('Contents');
-        foreach ($contents as $file) {
-            $files[] = $file['Key'];
+        if ( is_array($contents)) {
+            foreach ($contents as $file) {
+                $files[] = $file['Key'];
+            }
         }
 
         return [$files, $directories];
@@ -253,6 +262,13 @@ class AwsS3MediaSource extends modMediaSource implements modMediaSourceInterface
             $menu[] = [
                 'text' => $this->xpdo->lexicon('file_folder_create_here'),
                 'handler' => 'this.createDirectory',
+            ];
+        }
+
+        if ($this->hasPermission('directory_update') && $this->getOption('allowFolderCopy', $this->properties, false) ) {//&& $this->checkPolicy('save')) {
+            $menu[] = [
+                'text' => $this->xpdo->lexicon('rename'),
+                'handler' => 'this.renameDirectory',
             ];
         }
 
@@ -558,14 +574,150 @@ class AwsS3MediaSource extends modMediaSource implements modMediaSourceInterface
      *
      * @param string $oldPath
      * @param string $newName
+     * @param boolean $newNameFullPath false
+     * @param boolean $delete if true will delete the oldPath, otherwise creates a duplicate copy
      *
      * @return boolean
      */
-    public function renameContainer($oldPath, $newName)
+    public function renameContainer($oldPath, $newName, $newNameFullPath=false, $delete=true)
     {
-        return false;
+        if (!$this->getOption('allowFolderCopy', $this->properties, false)) {
+            return false;
+        }
+        $source_key = $this->cleanKey($oldPath);
+        if (!$newNameFullPath) {
+            // get the base from the old path:
+            $newName = substr($oldPath, 0, strlen($oldPath) - (strlen(basename($oldPath))+1)).''.$newName;
+        }
+        /** @var  $new_key ~ needs the full path! */
+        $new_key = trim($newName).'/';
+
+        $base_same = '';
+        $chars = str_split($source_key);
+        $new_chars = str_split($new_key);
+        foreach ($chars as $x => $char) {
+            if ($char = $new_chars[$x]) {
+                $base_same .= $char;
+            }
+            break;
+        }
+
+        try {
+            if (!$this->driver->doesObjectExist($this->bucket, $oldPath)) {
+                $this->addError('file', $this->xpdo->lexicon('file_folder_err_ns') . ': ' . $oldPath);
+                return false;
+            }
+            $use_batch = false;
+            // Copy the main object, single:
+            if ( $use_batch ) {
+                $this->driver->copyObject(array(
+                    'Bucket' => $this->bucket,
+                    'Key' => $new_key,
+                    'CopySource' => "{$this->bucket}/{$source_key}",
+                ));
+            }
+            // now copy any children:
+            // Perform a batch of CopyObject operations.
+            $batch = $this->copyDirectory($source_key, $new_key, $use_batch);
+
+            if ($use_batch) {
+                /**
+                 * This appears to be the preferred method BUT Batch caused:
+                 * PHP Fatal error: Call to a member function getHandlerList() on array in
+                 * core/components/awss3mediasource/model/vendor/aws/aws-sdk-php/src/AwsClientTrait.php
+                 * on line 64
+                 */
+                try {
+                    $successful = $this->driver->execute($batch);
+                    $failed = array();
+                    $delete = true;
+                } catch (\Guzzle\Service\Exception\CommandTransferException $e) {
+                    $successful = $e->getSuccessfulCommands();
+                    $failed = $e->getFailedCommands();
+                    $this->addError('file', 'Error occurred when renaming folder, failed: ' . $e->getFailedCommands() .
+                        PHP_EOL . '    Successful: ' . $e->getSuccessfulCommands() .
+                        PHP_EOL . '    Source: ' . $source_key . ' New: ' . $new_key);
+                    $delete = false;
+                }
+            }
+            //$this->xpdo->logManagerAction('directory_copy', '', $path);
+            if ( $delete ) {
+                // delete the folder:
+                return $this->removeContainer($oldPath);
+            }
+
+        } catch (Exception $e) {
+            $this->addError('file', 'Error occurred when renaming container (copy and delete old): ' . $e->getMessage().
+                PHP_EOL.' Path: '. $source_key.' New: '.$new_key);
+            $this->xpdo->log(xPDO::LOG_LEVEL_ERROR, '[AWS S3 MS] Error occurred when renaming container (copy and delete old): ' . $e->getMessage());
+            return false;
+        }
+
+        return true;
     }
 
+    /**
+     * @param $key
+     * @param $new_key
+     * @param bool $batch
+     * @param array $batch_commands
+     *
+     * @return array
+     */
+    protected function copyDirectory($key, $new_key, $batch=false, $batch_commands=array())
+    {
+        // copy the folder object:
+        if ( $batch ) {
+            $batch_commands[] = $this->driver->getCommand('CopyObject', array(
+                'Bucket' => $this->driver,
+                'Key' => "{$new_key}",
+                'CopySource' => "{$this->driver}/{$key}",
+            ));
+        } else {
+            $this->driver->copyObject(array(
+                'Bucket'     => $this->bucket,
+                'Key'        => $new_key,
+                'CopySource' => "{$this->bucket}/{$key}",
+            ));
+        }
+
+        list($listFiles, $listDirectories) = $this->listDirectory($key);
+
+        // copy child directories:
+        foreach ($listDirectories as $idx => $child_key) {
+            // folder/child/ to
+            if ($child_key == $key) continue;
+
+            $new_child_key = substr_replace($child_key, $new_key, 0, strlen($key));
+            $batch_commands = $this->copyDirectory($child_key, $new_child_key, $batch, $batch_commands);
+        }
+        // copy files:
+        foreach ($listFiles as $idx => $child_key) {
+            if ($child_key == $key) continue;
+
+            $new_child_key = substr_replace($child_key, $new_key, 0, strlen($key));
+            if ( $batch ) {
+                $batch_commands[] = $this->driver->getCommand('CopyObject', array(
+                    'Bucket' => $this->driver,
+                    'Key' => "{$new_child_key}",
+                    'CopySource' => "{$this->driver}/{$child_key}",
+                ));
+            } else {
+                $this->driver->copyObject(array(
+                    'Bucket'     => $this->bucket,
+                    'Key'        => $new_child_key,
+                    'CopySource' => "{$this->bucket}/{$child_key}",
+                ));
+            }
+        }
+
+        return $batch_commands;
+    }
+
+    protected function makeNewKey($base, $key, $new)
+    {
+
+    }
     /**
      * Remove an empty folder
      *
@@ -622,6 +774,7 @@ class AwsS3MediaSource extends modMediaSource implements modMediaSourceInterface
     public function uploadObjectsToContainer($container, array $files = array())
     {
         if ($container == '/' || $container == '.') $container = '';
+        $container = ltrim(trim($this->xpdo->getOption('baseDir', $this->properties, ''), '/') . '/'.$container, '/');
 
         $allowedFileTypes = explode(',', $this->xpdo->getOption('upload_files', null, ''));
         $allowedFileTypes = array_merge(explode(',', $this->xpdo->getOption('upload_images')), explode(',', $this->xpdo->getOption('upload_media')), explode(',', $this->xpdo->getOption('upload_flash')), $allowedFileTypes);
@@ -980,6 +1133,7 @@ class AwsS3MediaSource extends modMediaSource implements modMediaSourceInterface
      */
     public function renameObject($oldPath, $newName)
     {
+        $oldPath = $this->cleanKey($oldPath);
         try {
             $exists = $this->driver->doesObjectExist($this->bucket, $oldPath);
             if (!$exists) {
@@ -1017,61 +1171,68 @@ class AwsS3MediaSource extends modMediaSource implements modMediaSourceInterface
     /**
      * Move a file or folder to a specific location
      *
-     * @param string $from The location to move from
-     * @param string $to The location to move to
+     * @param string $from The location to move from, full path
+     * @param string $to The location to move to, new directory path only
      * @param string $point
      *
      * @return boolean
      */
     public function moveObject($from, $to, $point = 'append')
     {
-        if (substr(strrev($from), 0, 1) == '/') {
-            $this->xpdo->error->message = $this->xpdo->lexicon('s3_no_move_folder', array(
-                'from' => $from
-            ));
+        // Does the file/folder to be moved exist?
+        $existsFrom = $this->driver->doesObjectExist($this->bucket, $from);
+        if (!$existsFrom) {
+            $this->xpdo->error->message = $this->xpdo->lexicon('file_err_ns') . ': ' . $from;
 
             return false;
         }
 
-        try {
-            $existsFrom = $this->driver->doesObjectExist($this->bucket, $from);
-            if (!$existsFrom) {
-                $this->xpdo->error->message = $this->xpdo->lexicon('file_err_ns') . ': ' . $from;
-    
+        if ($to != '/') {
+            // Does the destination folder exist?
+            $existsTo = $this->driver->doesObjectExist($this->bucket, $to);
+            if (!$existsTo) {
+                $this->xpdo->error->message = $this->xpdo->lexicon('file_err_ns') . ': ' . $to;
+
                 return false;
             }
-    
-            if ($to != '/') {
-                $existsTo = $this->driver->doesObjectExist($this->bucket, $to);
-                if (!$existsTo) {
-                    $this->xpdo->error->message = $this->xpdo->lexicon('file_err_ns') . ': ' . $to;
-    
+
+            if ($point != 'append') {
+                $dir = dirname(rtrim($to, '/'));
+                $dir = ($dir == '.') ? '' : $dir . '/';
+
+                $toPath = $dir . basename($from);
+            } else {
+                $toPath = rtrim($to, '/') . '/' . basename($from);
+            }
+        } else {
+            $toPath = basename($from);
+        }
+
+        try {
+            // This is a folder:
+            if (substr(strrev($from), 0, 1) == '/') {
+                if (!$this->getOption('allowFolderCopy', $this->properties, false)) {
+                    $this->xpdo->error->message = $this->xpdo->lexicon('s3_no_move_folder', array(
+                        'from' => $from
+                    ));
                     return false;
-                }
-    
-                if ($point != 'append') {
-                    $dir = dirname(rtrim($to, '/'));
-                    $dir = ($dir == '.') ? '' : $dir . '/';
-    
-                    $toPath = $dir . basename($from);
                 } else {
-                    $toPath = rtrim($to, '/') . '/' . basename($from);
+                    return $this->renameContainer($from, $toPath, true);
                 }
             } else {
-                $toPath = basename($from);
-            }
-        
-            $this->driver->copyObject([
-                'ACL' => 'public-read',
-                'Bucket' => $this->bucket,
-                'CopySource' => $this->bucket . '/' . $from,
-                'Key' => $toPath
-            ]);
+                // This is a file
+                $this->driver->copyObject([
+                    'ACL' => 'public-read',
+                    'Bucket' => $this->bucket,
+                    'CopySource' => $this->bucket . '/' . $from,
+                    'Key' => $toPath
+                ]);
 
-            $this->driver->deleteObject([
-                'Bucket' => $this->bucket,
-                'Key' => $from
-            ]);
+                $this->driver->deleteObject([
+                    'Bucket' => $this->bucket,
+                    'Key' => $from
+                ]);
+            }
         } catch (Exception $e) {
             $this->xpdo->error->message = $this->xpdo->lexicon('file_folder_err_rename') . ': ' . $to . ' -> ' . $from;
 
@@ -1270,6 +1431,14 @@ class AwsS3MediaSource extends modMediaSource implements modMediaSourceInterface
                 'type' => 'textfield',
                 'options' => '',
                 'value' => '.svn,.git,_notes,nbproject,.idea,.DS_Store',
+                'lexicon' => 'core:source',
+            ),
+            'allowFolderCopy' => array(
+                'name' => 'allowFolderCopy',
+                'desc' => 'prop_s3.allowFolderCopy_desc',
+                'type' => 'combo-boolean',
+                'options' => '',
+                'value' => '1',
                 'lexicon' => 'core:source',
             ),
         );
