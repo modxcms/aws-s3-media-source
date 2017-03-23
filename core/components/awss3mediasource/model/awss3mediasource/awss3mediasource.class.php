@@ -126,6 +126,7 @@ class AwsS3MediaSource extends modMediaSource implements modMediaSourceInterface
                 'type' => 'dir',
                 'leaf' => false,
                 'path' => $currentPath,
+                'pathRelative' => $currentPath,
                 'perms' => '',
             );
 
