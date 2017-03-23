@@ -92,6 +92,11 @@ class AwsS3MediaSource extends modMediaSource implements modMediaSourceInterface
      */
     public function getContainerList($path)
     {
+        /** Need to check for the root or first loaded Media Source to add the proper baseDir if set. */
+        if ( empty(trim($path, '/'))) {
+            $base_dir = $this->xpdo->getOption('baseDir', $this->properties, '');
+            $path = trim($base_dir, '/') . '/' . ltrim($path, '/');
+        }
         list($listFiles, $listDirectories) = $this->listDirectory($path);
         $editAction = $this->getEditActionId();
 
@@ -1303,6 +1308,14 @@ class AwsS3MediaSource extends modMediaSource implements modMediaSourceInterface
                 'options' => '',
                 'value' => '',
                 'lexicon' => 'core:source',
+            ),
+            'baseDir' => array(
+                'name' => 'baseDir',
+                'desc' => 'prop_s3.baseDir_desc',
+                'type' => 'textfield',
+                'options' => '',
+                'value' => '',
+                'lexicon' => 'awss3mediasource:source',
             ),
             'key' => array(
                 'name' => 'key',
