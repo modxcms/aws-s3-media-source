@@ -125,7 +125,7 @@ class AwsS3MediaSource extends modMediaSource implements modMediaSourceInterface
             $directories[$currentPath] = array(
                 'id' => $currentPath,
                 //'text' => '<span style="display:none;">'.substr($currentPath, 0, strlen($currentPath) - (strlen($fileName)+1)).'</span>'.$fileName,
-                'text' => $text,
+                'text' => $fileName,
                 'cls' => 'folder',
                 'iconCls' => 'icon icon-folder',
                 'type' => 'dir',
@@ -223,13 +223,17 @@ class AwsS3MediaSource extends modMediaSource implements modMediaSourceInterface
         $files = [];
 
         $prefixes = $result->get('CommonPrefixes');
-        foreach ($prefixes as $folder) {
-            $directories[] = $folder['Prefix'];
+        if ( is_array($prefixes) ) {
+            foreach ($prefixes as $folder) {
+                $directories[] = $folder['Prefix'];
+            }
         }
 
         $contents = $result->get('Contents');
-        foreach ($contents as $file) {
-            $files[] = $file['Key'];
+        if ( is_array($contents)) {
+            foreach ($contents as $file) {
+                $files[] = $file['Key'];
+            }
         }
 
         return [$files, $directories];
@@ -560,16 +564,21 @@ class AwsS3MediaSource extends modMediaSource implements modMediaSourceInterface
      *
      * @param string $oldPath
      * @param string $newName
+     * @param boolean $newNameFullPath false
      * @param boolean $delete if true will delete the oldPath, otherwise creates a duplicate copy
      *
      * @return boolean
      */
-    public function renameContainer($oldPath, $newName, $delete=true)
+    public function renameContainer($oldPath, $newName, $newNameFullPath=false, $delete=true)
     {
         if (!$this->getOption('allowFolderCopy', $this->properties, false)) {
             return false;
         }
         $source_key = $this->cleanKey($oldPath);
+        if (!$newNameFullPath) {
+            // get the base from the old path:
+            $newName = substr($oldPath, 0, strlen($oldPath) - (strlen(basename($oldPath))+1)).''.$newName;
+        }
         /** @var  $new_key ~ needs the full path! */
         $new_key = trim($newName).'/';
 
@@ -637,6 +646,14 @@ class AwsS3MediaSource extends modMediaSource implements modMediaSourceInterface
         return true;
     }
 
+    /**
+     * @param $key
+     * @param $new_key
+     * @param bool $batch
+     * @param array $batch_commands
+     *
+     * @return array
+     */
     protected function copyDirectory($key, $new_key, $batch=false, $batch_commands=array())
     {
         // copy the folder object:
@@ -733,6 +750,7 @@ class AwsS3MediaSource extends modMediaSource implements modMediaSourceInterface
     public function uploadObjectsToContainer($container, array $files = array())
     {
         if ($container == '/' || $container == '.') $container = '';
+        $container = ltrim(trim($this->xpdo->getOption('baseDir', $this->properties, ''), '/') . '/'.$container, '/');
 
         $allowedFileTypes = explode(',', $this->xpdo->getOption('upload_files', null, ''));
         $allowedFileTypes = array_merge(explode(',', $this->xpdo->getOption('upload_images')), explode(',', $this->xpdo->getOption('upload_media')), explode(',', $this->xpdo->getOption('upload_flash')), $allowedFileTypes);
@@ -1165,7 +1183,7 @@ class AwsS3MediaSource extends modMediaSource implements modMediaSourceInterface
                     ));
                     return false;
                 } else {
-                    return $this->renameContainer($from, $toPath);
+                    return $this->renameContainer($from, $toPath, true);
                 }
             } else {
                 // This is a file
