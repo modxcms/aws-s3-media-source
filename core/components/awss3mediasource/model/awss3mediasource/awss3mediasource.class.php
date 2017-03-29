@@ -761,24 +761,8 @@ class AwsS3MediaSource extends modMediaSource implements modMediaSourceInterface
 
         if ( $object_type == 'file') {
             $file = $fromSource->getObjectContents($from_path);
-            /**
-             * name
-            basename
-            path
-            size
-            last_accessed
-            last_modified
-            content
-            image
-            is_writable
-            is_readable
-             */
-            $new_path = $container . $file['name'];
-            foreach ($file as $n => $v) {
-                $cli->out($n);
-            }
-            $cli->out(ucfirst($method).' file from: '.$file['path'].' to '.$new_path.' start ');
-            //return;
+            $new_path = $container;
+
             if ($this->transferFile($file['path'], $new_path, $cli, $method) && $method == 'move') {
                 // remove from the source:
                 /** @var modFile $file */
@@ -808,21 +792,17 @@ class AwsS3MediaSource extends modMediaSource implements modMediaSourceInterface
                     if ( $object['type'] == 'dir' ) {
                         // recursion:
                         $new_dir = ltrim($new_dir.basename($object['id']), '/');
-                        //$cli->out('Basename: '.basename($object['id']).' || '.$new_dir.' || '.$object['id']);
-                        //$cli->out(ucfirst($method).' DIR from: '.$object['id'].' to '.$new_dir.' start ');
 
                         $this->transferObjects($fromSource, $object['id'], $cli, 'dir', $new_dir, $method);
                         continue;
                     }
                     // copy/move file:
                     $new_path = trim($new_dir. $object['text'], '/');
-                    //$cli->out(ucfirst($method).' file from: '.$object['text'].' to '.$new_path.' start ');
-                    //$cli->out(print_r($object, true));
-                    //continue;
+
                     if ($this->transferFile($object['path'], $new_path, $cli, $method) && $method == 'move') {
                         // remove from the source:
                         /** @var modFile $file */
-                        $remove_file = $fromSource->fileHandler->make($file['path']);
+                        $remove_file = $fromSource->fileHandler->make($object['path']);
                         $error = false;
                         /* verify file exists and is writable */
                         if (!$remove_file->exists()) {
