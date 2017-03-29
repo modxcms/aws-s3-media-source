@@ -565,7 +565,21 @@ class AwsS3MediaSource extends modMediaSource implements modMediaSourceInterface
         $path = trim($this->cleanKey($path), '/').'/';
 
         try {
-            if (!$this->driver->doesObjectExist($this->bucket, $path)) {
+            /** Since S3 is flat file, the "folder" may not exist but it may have matching prefixes so search for them */
+            $exists = false;
+            $iterator = $this->driver->getIterator(
+                'ListObjects',
+                array(
+                    'Bucket' => $this->bucket,
+                    'Prefix' => $path
+                ),
+                array('limit'  => 1)
+            );
+            foreach ($iterator as $object) {
+                $exists = true;
+            }
+            // this most find an exact match: if (!$this->driver->doesObjectExist($this->bucket, $path)) {
+            if (!$exists) {
                 $this->addError('file', $this->xpdo->lexicon('file_folder_err_ns') . ': ' . $path);
                 return false;
             }
