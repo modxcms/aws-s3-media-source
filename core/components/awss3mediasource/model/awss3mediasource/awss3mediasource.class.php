@@ -513,6 +513,12 @@ class AwsS3MediaSource extends modMediaSource implements modMediaSourceInterface
      */
     public function createContainer($name, $parentContainer)
     {
+        /** Need to check for the root/parent of Media Source to add the proper baseDir if set. */
+        if ( empty(trim($parentContainer, '/'))) {
+            $base_dir = $this->xpdo->getOption('baseDir', $this->properties, '');
+            $parentContainer = trim($base_dir, '/') . '/' ;
+        }
+
         $newPath = ltrim($parentContainer . rtrim($name, '/') . '/', '/');
 
         try {
@@ -522,7 +528,6 @@ class AwsS3MediaSource extends modMediaSource implements modMediaSourceInterface
                 return false;
             }
 
-        
             $this->driver->putObject([
                 'Bucket' => $this->bucket,
                 'Key' => $newPath,
