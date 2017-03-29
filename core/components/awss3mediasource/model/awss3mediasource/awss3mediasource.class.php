@@ -376,6 +376,11 @@ class AwsS3MediaSource extends modMediaSource implements modMediaSourceInterface
     public function getObjectsInContainer($path)
     {
         $properties = $this->getPropertyList();
+        /** Need to check for the root/parent of Media Source to add the proper baseDir if set. */
+        if ( empty(trim($path, '/'))) {
+            $base_dir = $this->xpdo->getOption('baseDir', $this->properties, '');
+            $path = trim($base_dir, '/') . '/' ;
+        }
         list($listFiles) = $this->listDirectory($path);
         $editAction = $this->getEditActionId();
 
