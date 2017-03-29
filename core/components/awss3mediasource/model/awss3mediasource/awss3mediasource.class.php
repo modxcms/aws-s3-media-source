@@ -1191,7 +1191,7 @@ class AwsS3MediaSource extends modMediaSource implements modMediaSourceInterface
         try {
             // This is a folder:
             if (substr(strrev($from), 0, 1) == '/') {
-                if ($this->getOption('allowFolderCopy', $this->properties, false)) {
+                if (!$this->getOption('allowFolderCopy', $this->properties, false)) {
                     $this->xpdo->error->message = $this->xpdo->lexicon('s3_no_move_folder', array(
                         'from' => $from
                     ));
