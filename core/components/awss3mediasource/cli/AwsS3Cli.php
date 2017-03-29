@@ -161,8 +161,76 @@ class AwsS3Cli
         $this->climate->out($toSource->getBaseDir().'||'.$from_path.'||'.ltrim($to_path, '/').' || Container: '.$container);
         $toSource->transferObjects($fromSource, $from_path, $this->climate, $object_type, $container, $method);
 
-        // log to redirector:
+        if ( $method == 'move') {
+            // log to redirector:
+            $this->logRedirect(
+                $fromSource->prepareOutputUrl($from_path),
+                //rtrim($toSource->properties['url'], '/') . '/'.$toSource->prepareOutputUrl($container),
+                $toSource->getObjectUrl($container),
+                $object_type
+            );
+        }
+    }
 
+    /**
+     * @param string $old Needs to be full relative path
+     * @param string $new needs to be full URL
+     * @param string $type
+     *
+     * @return mixed
+     */
+    protected function logRedirect($old, $new, $type='file')
+    {
+        $old = trim($old, '/');
+        $new = trim($new, '/');
+        if ($type == 'dir') {
+            $old = '^'.str_replace('/', '\/', $old).'(.*)$';
+            $new = str_replace('/', '\/', $new).'$1';
+        } else {
+            // @TODO temp fix: Redirect is giving SSL errors and not validating
+            $new = str_replace('https:', 'http:', $new);
+        }
+        //return;
+        $corePath = $this->modx->getOption(
+            'redirector.core_path',
+            array(),
+            $this->modx->getOption('core_path') . 'components/redirector/'
+        );
+        // @depends on https://github.com/modxcms/Redirector but will not run if not installed
+        $redirector = $this->modx->getService('redirector', 'Redirector', $corePath . 'model/redirector/', array());
+        if ($redirector instanceof Redirector) {
+            $response = $this->modx->runProcessor(
+                'mgr/redirect/create',
+                array(
+                    'active' => 1,
+                    'pattern' => $old,
+                    'target' => $new
+                ),
+                array('processors_path' => $corePath.'processors/')
+            );
+            $this->climate->out('Class: '.get_class($response));
+            if ($response->isError()) {
+                $this->climate->to('error')->red('Error creating redirect rule: '.$response->getMessage());
+                $data = [];
+                foreach ($response->getResponse()['errors'] as $error){
+                    $data[] = [$error['id'], $error['msg']];
+                }
+                $this->climate->to('error')->red()->table($data);
+                //$this->climate->to('error')->red(print_r($response->getResponse(), true))->table();
+            } else {
+                $this->climate->out('Redirector rule has been created');
+            }
+            $this->climate->table(
+                [
+                    [
+                        'Pattern', 'Target'
+                    ],
+                    [
+                        $old, $new
+                    ]
+                ]
+            );
+        }
     }
 
     /**
