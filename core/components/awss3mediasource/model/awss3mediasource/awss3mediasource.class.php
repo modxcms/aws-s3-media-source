@@ -689,7 +689,7 @@ class AwsS3MediaSource extends modMediaSource implements modMediaSourceInterface
             if ($child_key == $key) continue;
 
             $new_child_key = substr_replace($child_key, $new_key, 0, strlen($key));
-            $batch_commands = $this->copyFolder($child_key, $new_child_key, $batch, $batch_commands);
+            $batch_commands = $this->copyDirectory($child_key, $new_child_key, $batch, $batch_commands);
         }
         // copy files:
         foreach ($listFiles as $idx => $child_key) {
