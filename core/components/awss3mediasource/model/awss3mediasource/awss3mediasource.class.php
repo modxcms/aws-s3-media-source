@@ -1592,7 +1592,7 @@ class AwsS3MediaSource extends modMediaSource implements modMediaSourceInterface
      */
     public function getObjectUrl($object = '')
     {
-        $url = trim($this->properties['url'], '/');
+        $url = trim($this->properties['url'].$this->xpdo->getOption('baseDir', $this->properties, ''), '/');
 
         return $url . '/' . ltrim(str_replace($url, '', $object), '/');
     }
