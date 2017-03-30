@@ -764,6 +764,135 @@ class AwsS3MediaSource extends modMediaSource implements modMediaSourceInterface
     }
 
     /**
+     * @return string
+     */
+    public function getBaseDir()
+    {
+        return trim($this->xpdo->getOption('baseDir', $this->properties, ''), '/');
+    }
+
+    /**
+     * @param modMediaSource $fromSource
+     * @param string $from_path
+     * @param bool $cli
+     * @param string $object_type
+     * @param string $container
+     * @param string $method
+     */
+    public function transferObjects($fromSource, $from_path, $cli=false, $object_type='file', $container='', $method='copy')
+    {
+        if ($container == '/' || $container == '.') $container = '';
+
+        if ( $object_type == 'file') {
+            $file = $fromSource->getObjectContents($from_path);
+            $new_path = $container;
+
+            if ($this->transferFile($file['path'], $new_path, $cli, $method) && $method == 'move') {
+                // remove from the source:
+                /** @var modFile $file */
+                $remove_file = $fromSource->fileHandler->make($file['path']);
+                $error = false;
+                /* verify file exists and is writable */
+                if (!$remove_file->exists()) {
+                    $error = $this->xpdo->lexicon('file_err_nf').': '.$remove_file->getPath();
+                } else if (!$remove_file->isReadable() || !$remove_file->isWritable()) {
+                    $error = $this->xpdo->lexicon('file_err_perms_remove');
+                } else if (!($remove_file instanceof modFile)) {
+                    $error = $this->xpdo->lexicon('file_err_invalid');
+                } else if (!$remove_file->remove()) {
+                    $error = $this->xpdo->lexicon('file_err_remove');
+                }
+
+                if ($error && is_object($cli)) {
+                    $cli->to('error')->red('Error occurred when attempting to remove file: ' . $error);
+                    return false;
+                }
+            }
+        } else {
+            $list = $fromSource->getContainerList($from_path);
+            if ( count($list) > 0) {
+                foreach ($list as $object) {
+                    $new_dir = rtrim($container, '/').'/';
+                    if ( $object['type'] == 'dir' ) {
+                        // recursion:
+                        $new_dir = ltrim($new_dir.basename($object['id']), '/');
+
+                        $this->transferObjects($fromSource, $object['id'], $cli, 'dir', $new_dir, $method);
+                        continue;
+                    }
+                    // copy/move file:
+                    $new_path = trim($new_dir. $object['text'], '/');
+
+                    if ($this->transferFile($object['path'], $new_path, $cli, $method) && $method == 'move') {
+                        // remove from the source:
+                        /** @var modFile $file */
+                        $remove_file = $fromSource->fileHandler->make($object['path']);
+                        $error = false;
+                        /* verify file exists and is writable */
+                        if (!$remove_file->exists()) {
+                            $error = $this->xpdo->lexicon('file_err_nf').': '.$remove_file->getPath();
+                        } else if (!$remove_file->isReadable() || !$remove_file->isWritable()) {
+                            $error = $this->xpdo->lexicon('file_err_perms_remove');
+                        } else if (!($remove_file instanceof modFile)) {
+                            $error = $this->xpdo->lexicon('file_err_invalid');
+                        } else if (!$remove_file->remove()) {
+                            $error = $this->xpdo->lexicon('file_err_remove');
+                        }
+
+                        if ($error && is_object($cli)) {
+                            $cli->to('error')->red('Error occurred when attempting to remove file: ' . $error);
+                            //return false;
+                        }
+                    }
+                }
+            }
+        }
+
+    }
+
+    /**
+     * @param string $source_file complete file path
+     * @param string $new_path
+     * @param object $cli
+     * @param string $method copy or move
+     *
+     * @return bool
+     */
+    protected function transferFile($source_file, $new_path, $cli, $method)
+    {
+        $ext = @pathinfo($source_file, PATHINFO_EXTENSION);
+        $ext = strtolower($ext);
+
+        $contentType = $this->getContentType($ext);
+
+        try {
+            $this->driver->putObject([
+                'Bucket' => $this->bucket,
+                'Key' => $new_path,
+                'ACL' => 'public-read',
+                'ContentType' => $contentType,
+                'SourceFile' => $source_file
+            ]);
+            // if index.html:
+            $org_file_name = @pathinfo($new_path, PATHINFO_BASENAME);
+            if ( $org_file_name == 'index.html' || $org_file_name == 'index.htm') {
+                // make it the root:
+                $cli->out('Make Index: '.ucfirst($method).' file from: '.$source_file.' to '.substr($new_path, 0, strlen($new_path) - strlen($org_file_name)).' ');
+                $this->transferFile($source_file, substr($new_path, 0, strlen($new_path) - strlen($org_file_name)), $cli, $method);
+            }
+        } catch (Exception $e) {
+            if (is_object($cli)) {
+                $cli->to('error')->red('Error occurred when attempting to ' . $method . ' file: ' . $e->getMessage());
+            }
+            return false;
+        }
+
+        if (is_object($cli)) {
+            $cli->out(ucfirst($method).' file from: '.$source_file.' to '.$new_path.' complete ');
+        }
+        return true;
+    }
+    /**
      * Upload files to Swift
      *
      * @param string $container
