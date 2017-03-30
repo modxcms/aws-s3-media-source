@@ -560,10 +560,27 @@ class AwsS3MediaSource extends modMediaSource implements modMediaSourceInterface
      */
     public function removeContainer($path)
     {
-        $path = trim($path, '/');
+        /**
+         * Need the trailing delimiter
+         */
+        $path = trim($this->cleanKey($path), '/').'/';
 
         try {
-            if (!$this->driver->doesObjectExist($this->bucket, $path)) {
+            /** Since S3 is flat file, the "folder" may not exist but it may have matching prefixes so search for them */
+            $exists = false;
+            $iterator = $this->driver->getIterator(
+                'ListObjects',
+                array(
+                    'Bucket' => $this->bucket,
+                    'Prefix' => $path
+                ),
+                array('limit'  => 1)
+            );
+            foreach ($iterator as $object) {
+                $exists = true;
+            }
+            // this most find an exact match: if (!$this->driver->doesObjectExist($this->bucket, $path)) {
+            if (!$exists) {
                 $this->addError('file', $this->xpdo->lexicon('file_folder_err_ns') . ': ' . $path);
                 return false;
             }
@@ -1040,6 +1057,22 @@ class AwsS3MediaSource extends modMediaSource implements modMediaSourceInterface
     }
 
     /**
+     * @param string $path
+     *
+     * @return string $path
+     */
+    protected function cleanKey($path)
+    {
+        /**
+         * Files need only the Key which appears to be the relative path.
+         * So the URL property that MODX adds to the passed parameter needs to be removed.
+         *
+         * http://docs.aws.amazon.com/AmazonS3/latest/dev/UsingMetadata.html#object-keys
+         */
+        $path = str_replace($this->getOption('url', $this->properties, ''), '', $path);
+        return $path;
+    }
+    /**
      * Delete a file
      *
      * @param string $path
@@ -1048,6 +1081,7 @@ class AwsS3MediaSource extends modMediaSource implements modMediaSourceInterface
      */
     public function removeObject($path)
     {
+        $path = $this->cleanKey($path);
         try {
             $exists = $this->driver->doesObjectExist($this->bucket, $path);
             if (!$exists) {
