@@ -92,6 +92,11 @@ class AwsS3MediaSource extends modMediaSource implements modMediaSourceInterface
      */
     public function getContainerList($path)
     {
+        /** Need to check for the root or first loaded Media Source to add the proper baseDir if set. */
+        if ( empty(trim($path, '/'))) {
+            $base_dir = $this->xpdo->getOption('baseDir', $this->properties, '');
+            $path = trim($base_dir, '/') . '/' . ltrim($path, '/');
+        }
         list($listFiles, $listDirectories) = $this->listDirectory($path);
         $editAction = $this->getEditActionId();
 
@@ -372,6 +377,11 @@ class AwsS3MediaSource extends modMediaSource implements modMediaSourceInterface
     public function getObjectsInContainer($path)
     {
         $properties = $this->getPropertyList();
+        /** Need to check for the root/parent of Media Source to add the proper baseDir if set. */
+        if ( empty(trim($path, '/'))) {
+            $base_dir = $this->xpdo->getOption('baseDir', $this->properties, '');
+            $path = trim($base_dir, '/') . '/' ;
+        }
         list($listFiles) = $this->listDirectory($path);
         $editAction = $this->getEditActionId();
 
@@ -509,6 +519,12 @@ class AwsS3MediaSource extends modMediaSource implements modMediaSourceInterface
      */
     public function createContainer($name, $parentContainer)
     {
+        /** Need to check for the root/parent of Media Source to add the proper baseDir if set. */
+        if ( empty(trim($parentContainer, '/'))) {
+            $base_dir = $this->xpdo->getOption('baseDir', $this->properties, '');
+            $parentContainer = trim($base_dir, '/') . '/' ;
+        }
+
         $newPath = ltrim($parentContainer . rtrim($name, '/') . '/', '/');
 
         try {
@@ -518,7 +534,6 @@ class AwsS3MediaSource extends modMediaSource implements modMediaSourceInterface
                 return false;
             }
 
-        
             $this->driver->putObject([
                 'Bucket' => $this->bucket,
                 'Key' => $newPath,
@@ -888,7 +903,17 @@ class AwsS3MediaSource extends modMediaSource implements modMediaSourceInterface
      */
     public function createObject($path, $name, $content)
     {
+        /** Need to check for the root/parent of Media Source to add the proper baseDir if set. */
+        if ( empty(trim($path, '/'))) {
+            $base_dir = $this->xpdo->getOption('baseDir', $this->properties, '');
+            $path = trim($base_dir, '/') . '/' ;
+        }
+
+        $key = ltrim($path . trim($name, '/'), '/');
+        $this->xpdo->log(xPDO::LOG_LEVEL_ERROR, 'Key ' . $key);
+
         $key = $path . $name;
+        $this->xpdo->log(xPDO::LOG_LEVEL_ERROR, 'Key ' . $key);
 
         try {
             $exists = $this->driver->doesObjectExist($this->bucket, $key);
@@ -1107,19 +1132,32 @@ class AwsS3MediaSource extends modMediaSource implements modMediaSourceInterface
      * Get the contents of a specified file
      *
      * @param string $objectPath
+     * @param boolean $resend_on_error if true will call on itself and attach the baseDir on 404
      *
      * @return array
      */
-    public function getObjectContents($objectPath)
+    public function getObjectContents($objectPath, $resend_on_error=true)
     {
         $imageExtensions = $this->getOption('imageExtensions', $this->properties, 'jpg,jpeg,png,gif');
         $imageExtensions = explode(',', $imageExtensions);
         $fileExtension = pathinfo($objectPath, PATHINFO_EXTENSION);
 
-        $object = $this->driver->getObject([
-            'Bucket' => $this->bucket,
-            'Key' => $objectPath
-        ]);
+        try {
+            $object = $this->driver->getObject([
+                'Bucket' => $this->bucket,
+                'Key' => $objectPath
+            ]);
+        } catch (Exception $e) {
+            /** Need to check for the root/parent of Media Source to add the proper baseDir if set for the root Create File. */
+            $base_dir = $this->xpdo->getOption('baseDir', $this->properties, '');
+            if (!empty(trim($base_dir, '/')) && $resend_on_error) {
+                $path = trim($base_dir, '/') . '/' .$objectPath ;
+                return $this->getObjectContents($path, false);
+            } else {
+                $this->xpdo->log(xPDO::LOG_LEVEL_ERROR, '[AWS S3 MS] Error occurred when retrieving object: ' . $objectPath . ' msg: ' . $e->getMessage());
+                return false;
+            }
+        }
 
         $lastModified = $object->get('LastModified');
         $timeFormat = $this->ctx->getOption('manager_time_format');
@@ -1174,6 +1212,14 @@ class AwsS3MediaSource extends modMediaSource implements modMediaSourceInterface
                 'options' => '',
                 'value' => '',
                 'lexicon' => 'core:source',
+            ),
+            'baseDir' => array(
+                'name' => 'baseDir',
+                'desc' => 'prop_s3.baseDir_desc',
+                'type' => 'textfield',
+                'options' => '',
+                'value' => '',
+                'lexicon' => 'awss3mediasource:source',
             ),
             'key' => array(
                 'name' => 'key',

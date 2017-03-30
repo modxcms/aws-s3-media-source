@@ -1,3 +1,4 @@
+- Limit Media Source to sub directory/folder
 - Fix issue with Delete Files/Folders
 - Fix Create Directory Here
 
