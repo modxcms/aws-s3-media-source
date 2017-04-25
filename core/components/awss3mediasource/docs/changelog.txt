@@ -1,3 +1,4 @@
+- Caching the container contents for listDirectory
 - Transfer files/folders from local Media Source to S3 via cli
 - Fix Rename File/Folder and Move Folder
 - Limit Media Source to sub directory/folder

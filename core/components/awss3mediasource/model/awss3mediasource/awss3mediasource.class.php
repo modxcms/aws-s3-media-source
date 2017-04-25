@@ -6,6 +6,17 @@ if (!class_exists('modMediaSource')) {
 
 class AwsS3MediaSource extends modMediaSource implements modMediaSourceInterface
 {
+    /** @var bool  */
+    protected $use_cache = true;
+
+    /** @var array  */
+    protected $cacheOptions = [
+        xPDO::OPT_CACHE_KEY => 'awss3mediasource'
+    ];
+
+    /** @var int in seconds */
+    protected $cache_life = 3600;
+
     /** @var Aws\S3\S3Client */
     protected $driver;
 
@@ -43,6 +54,9 @@ class AwsS3MediaSource extends modMediaSource implements modMediaSourceInterface
 
         $this->xpdo->lexicon->load('core:source');
         $this->properties = $this->getPropertyList();
+
+        $this->cache_life = (int)$this->xpdo->getOption('awss3mediasource.cache_life', $this->properties, 3600);
+        $this->use_cache = (bool)$this->xpdo->getOption('awss3mediasource.use_cache', $this->properties, true);
 
         try {
             $this->driver = new Aws\S3\S3Client([
@@ -168,7 +182,7 @@ class AwsS3MediaSource extends modMediaSource implements modMediaSourceInterface
                 'type' => 'file',
                 'leaf' => true,
                 'path' => $currentPath,
-                'page' => $this->isBinary($encoded) ? $page : null,
+                'page' => $this->isBinary($encoded, false, $path) ? $page : null,
                 'pathRelative' => $url,
                 'directory' => $currentPath,
                 'url' => $url,
@@ -207,7 +221,12 @@ class AwsS3MediaSource extends modMediaSource implements modMediaSourceInterface
         if (!empty($dir) && $dir != '/') {
             $c['prefix'] = $dir;
         }
-
+        if ( $this->use_cache ) {
+            $data = $this->getCache($dir);
+            if ($data) {
+                return $data;
+            }
+        }
         try {
             $result = $this->driver->listObjects([
                 'Bucket' => $this->bucket,
@@ -235,7 +254,9 @@ class AwsS3MediaSource extends modMediaSource implements modMediaSourceInterface
                 $files[] = $file['Key'];
             }
         }
-
+        if ( $this->use_cache ) {
+            $this->setCache($dir, [$files, $directories]);
+        }
         return [$files, $directories];
     }
 
@@ -315,11 +336,19 @@ class AwsS3MediaSource extends modMediaSource implements modMediaSourceInterface
      *
      * @param string $file
      * @param boolean $isContent If the passed string in $file is actual file content
+     * @param boolean $path the full container path, needed to get cache
      *
      * @return boolean True if a binary file.
      */
-    public function isBinary($file, $isContent = false)
+    public function isBinary($file, $isContent = false, $path=false)
     {
+        $cache = false;
+        if ($this->use_cache && $path !== false) {
+            $cache = $this->getCache($path);
+            if ($cache && isset($cache['isBinary'][$file])) {
+                return $cache['isBinary'][$file];
+            }
+        }
         if (!$isContent) {
             $fh = @fopen($file, 'r');
             $blk = @fread($fh, 512);
@@ -327,12 +356,24 @@ class AwsS3MediaSource extends modMediaSource implements modMediaSourceInterface
             @fclose($fh);
             @clearstatcache();
 
-            return (substr_count($blk, "^ -~" /*. "^\r\n"*/) / 512 > 0.3) || (substr_count($blk, "\x00") > 0) ? false : true;
+            $binary = (substr_count($blk, "^ -~" /*. "^\r\n"*/) / 512 > 0.3) || (substr_count($blk, "\x00") > 0) ? false : true;
+
+        } else {
+            $content = str_replace(array("\n", "\r", "\t"), '', $file);
+
+            $binary = ctype_print($content) ? false : true;
+
         }
 
-        $content = str_replace(array("\n", "\r", "\t"), '', $file);
+        if ( $this->use_cache && $path !== false && $cache !== false) {
+            if (!isset($cache['isBinary'])) {
+                $cache['isBinary'] = [];
+            }
+            $cache['isBinary'][$file] = $binary;
+            $this->setCache($path, $cache);
+        }
 
-        return ctype_print($content) ? false : true;
+        return $binary;
     }
 
     /**
@@ -446,7 +487,7 @@ class AwsS3MediaSource extends modMediaSource implements modMediaSourceInterface
                 'pathname' => $url,
                 'pathRelative' => $currentPath,
                 'size' => 0,
-                'page' => $this->isBinary($encoded) ? $page : null,
+                'page' => $this->isBinary($encoded, false, $path) ? $page : null,
                 'leaf' => true,
             );
 
@@ -564,6 +605,9 @@ class AwsS3MediaSource extends modMediaSource implements modMediaSourceInterface
             return false;
         }
 
+        if ( $this->use_cache ) {
+            $this->deleteCache($parentContainer);
+        }
         $this->xpdo->logManagerAction('directory_create', '', $newPath);
 
         return true;
@@ -651,6 +695,12 @@ class AwsS3MediaSource extends modMediaSource implements modMediaSourceInterface
                 PHP_EOL.' Path: '. $source_key.' New: '.$new_key);
             $this->xpdo->log(xPDO::LOG_LEVEL_ERROR, '[AWS S3 MS] Error occurred when renaming container (copy and delete old): ' . $e->getMessage());
             return false;
+        }
+
+        if ( $this->use_cache ) {
+            $this->deleteCache($oldPath);
+            // and the parent
+            $this->deleteCache(substr($oldPath, 0, strlen($oldPath) - (strlen(basename($oldPath))+1)));
         }
 
         return true;
@@ -758,6 +808,11 @@ class AwsS3MediaSource extends modMediaSource implements modMediaSourceInterface
             return false;
         }
 
+        if ( $this->use_cache ) {
+            $this->deleteCache($path);
+            // and the parent
+            $this->deleteCache(substr($path, 0, strlen($path) - (strlen(basename($path))+1)));
+        }
         $this->xpdo->logManagerAction('directory_remove', '', $path);
 
         return true;
@@ -951,6 +1006,10 @@ class AwsS3MediaSource extends modMediaSource implements modMediaSourceInterface
                 $this->addError('path', $this->xpdo->lexicon('file_err_upload'));
 
                 $this->xpdo->log(xPDO::LOG_LEVEL_ERROR, '[AWS S3 MS] Error occurred when uploading file: ' . $e->getMessage());
+            }
+
+            if ( $this->use_cache ) {
+                $this->deleteCache($container);
             }
         }
 
@@ -1218,6 +1277,10 @@ class AwsS3MediaSource extends modMediaSource implements modMediaSourceInterface
             return false;
         }
 
+        if ( $this->use_cache ) {
+            $this->deleteCache($path);
+        }
+
         $this->xpdo->logManagerAction('file_create', '', $key);
 
         return true;
@@ -1248,6 +1311,9 @@ class AwsS3MediaSource extends modMediaSource implements modMediaSourceInterface
             return false;
         }
 
+        if ( $this->use_cache ) {
+            $this->deleteCache($path);
+        }
         $this->xpdo->logManagerAction('file_update', '', $path);
         return true;
     }
@@ -1290,6 +1356,12 @@ class AwsS3MediaSource extends modMediaSource implements modMediaSourceInterface
             $this->xpdo->log(xPDO::LOG_LEVEL_ERROR, '[AWS S3 MS] Error occurred when renaming object: ' . $e->getMessage());
 
             return false;
+        }
+
+        if ( $this->use_cache ) {
+            $this->deleteCache($oldPath);
+            // and the parent
+            $this->deleteCache(substr($oldPath, 0, strlen($oldPath) - (strlen(basename($oldPath))+1)));
         }
 
         $this->xpdo->logManagerAction('file_rename', '', $oldPath);
@@ -1368,6 +1440,12 @@ class AwsS3MediaSource extends modMediaSource implements modMediaSourceInterface
             return false;
         }
 
+        if ( $this->use_cache ) {
+            $this->deleteCache($from);
+            // and the parent
+            $this->deleteCache(substr($from, 0, strlen($from) - (strlen(basename($from))+1)));
+        }
+
         return true;
     }
 
@@ -1411,6 +1489,12 @@ class AwsS3MediaSource extends modMediaSource implements modMediaSourceInterface
         } catch (Exception $e) {
             $this->xpdo->log(xPDO::LOG_LEVEL_ERROR, '[AWS S3 MS] Error occurred when deleting object: ' . $e->getMessage());
             return false;
+        }
+
+        if ( $this->use_cache ) {
+            $this->deleteCache($path);
+            // and the parent
+            $this->deleteCache(substr($path, 0, strlen($path) - (strlen(basename($path))+1)));
         }
 
         $this->xpdo->logManagerAction('file_remove', '', $path);
@@ -1596,4 +1680,32 @@ class AwsS3MediaSource extends modMediaSource implements modMediaSourceInterface
 
         return $url . '/' . ltrim(str_replace($url, '', $object), '/');
     }
+
+    /**
+     * @param string $key
+     *
+     * @return mixed
+     */
+    protected function getCache($key)
+    {
+        return $this->xpdo->cacheManager->get($this->bucket.'.'.$key, $this->cacheOptions);
+    }
+
+    /**
+     * @param string $key
+     * @param mixed $data
+     */
+    protected function setCache($key, $data)
+    {
+        $this->xpdo->cacheManager->set($this->bucket.'.'.$key, $data, $this->cache_life, $this->cacheOptions);
+    }
+
+    /**
+     * @param string $key
+     */
+    protected function deleteCache($key)
+    {
+        $this->xpdo->cacheManager->delete($this->bucket.'.'.$key, $this->cacheOptions);
+    }
+
 }
