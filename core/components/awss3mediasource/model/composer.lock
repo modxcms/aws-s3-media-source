@@ -4,26 +4,27 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#composer-lock-the-lock-file",
         "This file is @generated automatically"
     ],
+    "hash": "6593758d19e23a1fd6b9bc376b3ecb7c",
     "content-hash": "1c5d4e2de475681924aae15b68fac637",
     "packages": [
         {
             "name": "aws/aws-sdk-php",
-            "version": "3.23.2",
+            "version": "3.28.1",
             "source": {
                 "type": "git",
                 "url": "https://github.com/aws/aws-sdk-php.git",
-                "reference": "e22280859c36396f07000b9bc54fb9ae56f4c744"
+                "reference": "374225ec7e4ca2cc3edab2cd54b99ab383bfcbc6"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/aws/aws-sdk-php/zipball/e22280859c36396f07000b9bc54fb9ae56f4c744",
-                "reference": "e22280859c36396f07000b9bc54fb9ae56f4c744",
+                "url": "https://api.github.com/repos/aws/aws-sdk-php/zipball/374225ec7e4ca2cc3edab2cd54b99ab383bfcbc6",
+                "reference": "374225ec7e4ca2cc3edab2cd54b99ab383bfcbc6",
                 "shasum": ""
             },
             "require": {
                 "guzzlehttp/guzzle": "^5.3.1|^6.2.1",
                 "guzzlehttp/promises": "~1.0",
-                "guzzlehttp/psr7": "^1.3.1, !=1.4.0",
+                "guzzlehttp/psr7": "^1.4.1",
                 "mtdowling/jmespath.php": "~2.2",
                 "php": ">=5.5"
             },
@@ -39,7 +40,7 @@
                 "ext-simplexml": "*",
                 "ext-spl": "*",
                 "nette/neon": "^2.3",
-                "phpunit/phpunit": "~4.0|~5.0",
+                "phpunit/phpunit": "^4.8.35|^5.4.0",
                 "psr/cache": "^1.0"
             },
             "suggest": {
@@ -84,7 +85,7 @@
                 "s3",
                 "sdk"
             ],
-            "time": "2017-03-06T23:37:57+00:00"
+            "time": "2017-05-22 22:26:55"
         },
         {
             "name": "guzzlehttp/guzzle",
@@ -146,7 +147,7 @@
                 "rest",
                 "web service"
             ],
-            "time": "2017-02-28T22:50:30+00:00"
+            "time": "2017-02-28 22:50:30"
         },
         {
             "name": "guzzlehttp/promises",
@@ -197,20 +198,20 @@
             "keywords": [
                 "promise"
             ],
-            "time": "2016-12-20T10:07:11+00:00"
+            "time": "2016-12-20 10:07:11"
         },
         {
             "name": "guzzlehttp/psr7",
-            "version": "1.4.1",
+            "version": "1.4.2",
             "source": {
                 "type": "git",
                 "url": "https://github.com/guzzle/psr7.git",
-                "reference": "0d6c7ca039329247e4f0f8f8f6506810e8248855"
+                "reference": "f5b8a8512e2b58b0071a7280e39f14f72e05d87c"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/guzzle/psr7/zipball/0d6c7ca039329247e4f0f8f8f6506810e8248855",
-                "reference": "0d6c7ca039329247e4f0f8f8f6506810e8248855",
+                "url": "https://api.github.com/repos/guzzle/psr7/zipball/f5b8a8512e2b58b0071a7280e39f14f72e05d87c",
+                "reference": "f5b8a8512e2b58b0071a7280e39f14f72e05d87c",
                 "shasum": ""
             },
             "require": {
@@ -262,7 +263,7 @@
                 "uri",
                 "url"
             ],
-            "time": "2017-02-27T10:51:17+00:00"
+            "time": "2017-03-20 17:10:46"
         },
         {
             "name": "league/climate",
@@ -313,7 +314,7 @@
                 "php",
                 "terminal"
             ],
-            "time": "2016-04-04T20:24:59+00:00"
+            "time": "2016-04-04 20:24:59"
         },
         {
             "name": "mtdowling/jmespath.php",
@@ -368,7 +369,7 @@
                 "json",
                 "jsonpath"
             ],
-            "time": "2016-12-03T22:08:25+00:00"
+            "time": "2016-12-03 22:08:25"
         },
         {
             "name": "psr/http-message",
@@ -418,7 +419,7 @@
                 "request",
                 "response"
             ],
-            "time": "2016-08-06T14:39:51+00:00"
+            "time": "2016-08-06 14:39:51"
         },
         {
             "name": "seld/cli-prompt",
@@ -466,7 +467,7 @@
                 "input",
                 "prompt"
             ],
-            "time": "2017-03-18T11:32:45+00:00"
+            "time": "2017-03-18 11:32:45"
         }
     ],
     "packages-dev": [],
