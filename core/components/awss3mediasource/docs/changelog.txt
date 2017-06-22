@@ -1,3 +1,6 @@
+### 0.9.5
+- Use current context if none is passed
+
 ### 0.9.4
 - Update s3 lib
 
