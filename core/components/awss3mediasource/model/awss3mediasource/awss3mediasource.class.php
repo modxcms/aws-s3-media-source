@@ -41,6 +41,10 @@ class AwsS3MediaSource extends modMediaSource implements modMediaSourceInterface
     {
         parent::initialize();
 
+        if (!$this->ctx) {
+            $this->ctx =& $this->xpdo->context;
+        }
+
         $this->xpdo->lexicon->load('core:source');
         $this->properties = $this->getPropertyList();
 
