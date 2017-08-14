@@ -7,10 +7,10 @@ if (!class_exists('modMediaSource')) {
 class AwsS3MediaSource extends modMediaSource implements modMediaSourceInterface
 {
     /** @var Aws\S3\S3Client */
-    protected $driver;
+    public $driver;
 
     /** @var string */
-    protected $bucket;
+    public $bucket;
 
     /**
      * SwiftMediaSource constructor.
@@ -1168,13 +1168,13 @@ class AwsS3MediaSource extends modMediaSource implements modMediaSourceInterface
             'z' => 'application/x-compress',
             'zip' => 'application/zip'
         );
-        
+
         if (isset($mimeTypes[strtolower($ext)])) {
             $contentType = $mimeTypes[strtolower($ext)];
         } else {
             $contentType = 'octet/application-stream';
         }
-        
+
         return $contentType;
     }
 
@@ -1192,7 +1192,9 @@ class AwsS3MediaSource extends modMediaSource implements modMediaSourceInterface
         /** Need to check for the root/parent of Media Source to add the proper baseDir if set. */
         if ( empty(trim($path, '/'))) {
             $base_dir = $this->xpdo->getOption('baseDir', $this->properties, '');
-            $path = trim($base_dir, '/') . '/' ;
+            if (!empty(trim($base_dir, '/'))) {
+                $path = trim($base_dir, '/') . '/' ;
+            }
         }
 
         $key = ltrim($path . trim($name, '/'), '/');
@@ -1599,5 +1601,9 @@ class AwsS3MediaSource extends modMediaSource implements modMediaSourceInterface
         $url = trim($this->properties['url'].$this->xpdo->getOption('baseDir', $this->properties, ''), '/');
 
         return $url . '/' . ltrim(str_replace($url, '', $object), '/');
+    }
+
+    public function doesObjectExist($bucket, $name) {
+        return $this->driver->doesObjectExist($bucket, $name);
     }
 }
