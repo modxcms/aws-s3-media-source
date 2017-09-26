@@ -1,3 +1,9 @@
+### 0.10.0
+- Make bucket public
+- Make driver public
+- Add doesObjectExist method
+- Add trailing slash to basePath only if it's not empty
+
 ### 0.9.5
 - Use current context if none is passed
 
