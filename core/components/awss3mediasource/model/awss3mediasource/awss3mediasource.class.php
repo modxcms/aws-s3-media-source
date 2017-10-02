@@ -1403,6 +1403,8 @@ class AwsS3MediaSource extends modMediaSource implements modMediaSourceInterface
     public function removeObject($path)
     {
         $path = $this->cleanKey($path);
+        $path = ltrim($path, '/');
+        
         try {
             $exists = $this->driver->doesObjectExist($this->bucket, $path);
             if (!$exists) {

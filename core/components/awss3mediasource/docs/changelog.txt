@@ -1,3 +1,5 @@
+- Trim leading slash from $path
+
 ### 0.10.0
 - Make bucket public
 - Make driver public
