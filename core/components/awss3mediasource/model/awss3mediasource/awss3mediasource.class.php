@@ -49,14 +49,22 @@ class AwsS3MediaSource extends modMediaSource implements modMediaSourceInterface
         $this->properties = $this->getPropertyList();
 
         try {
-            $this->driver = new Aws\S3\S3Client([
+            $endpoint = $this->xpdo->getOption('endpoint', $this->properties, '');
+
+            $config = [
                 'version' => 'latest',
                 'region' => $this->xpdo->getOption('region', $this->properties, ''),
                 'credentials' => [
                     'key' => $this->xpdo->getOption('key', $this->properties, ''),
                     'secret' => $this->xpdo->getOption('secret_key', $this->properties, '')
                 ]
-            ]);
+            ];
+
+            if (!empty($endpoint)) {
+                $config['endpoint'] = $endpoint;
+            }
+
+            $this->driver = new Aws\S3\S3Client($config);
         } catch (Exception $e) {
             $this->xpdo->log(xPDO::LOG_LEVEL_ERROR, '[AWS S3 MS] ' . $e->getMessage());
             return false;
@@ -429,7 +437,7 @@ class AwsS3MediaSource extends modMediaSource implements modMediaSourceInterface
         foreach ($listFiles as $idx => $currentPath) {
             if ($currentPath == $path) continue;
             if (in_array($currentPath, $skipFiles)) continue;
-            
+
             $url = $bucketUrl . trim($currentPath, '/');
             $fileName = basename($currentPath);
 
@@ -485,7 +493,7 @@ class AwsS3MediaSource extends modMediaSource implements modMediaSourceInterface
                     'wctx' => $this->ctx->get('key'),
                     'source' => $this->get('id'),
                 ));
-                
+
                 $imageQuery = http_build_query(array(
                     'src' => $url,
                     'w' => $imageWidth,
@@ -496,16 +504,16 @@ class AwsS3MediaSource extends modMediaSource implements modMediaSourceInterface
                     'wctx' => $this->ctx->get('key'),
                     'source' => $this->get('id'),
                 ));
-                
+
                 $fileArray['thumb'] = $this->ctx->getOption('connectors_url', MODX_CONNECTORS_URL).'system/phpthumb.php?'.urldecode($thumbQuery);
                 $fileArray['thumb_width'] = $thumbWidth;
                 $fileArray['thumb_height'] = $thumbHeight;
-                
+
 //                $fileArray['image'] = $this->ctx->getOption('connectors_url', MODX_CONNECTORS_URL).'system/phpthumb.php?'.urldecode($imageQuery);
                 $fileArray['image'] = $url;
                 $fileArray['image_width'] = is_array($size) ? $size[0] : $imageWidth;
                 $fileArray['image_height'] = is_array($size) ? $size[1] : $imageHeight;
-                
+
                 $fileArray['preview'] = 1;
             } else {
                 $fileArray['thumb'] = $fileArray['image'] = $this->ctx->getOption('manager_url', MODX_MANAGER_URL).'templates/default/images/restyle/nopreview.jpg';
@@ -755,7 +763,7 @@ class AwsS3MediaSource extends modMediaSource implements modMediaSourceInterface
                 $this->addError('file', $this->xpdo->lexicon('file_folder_err_ns') . ': ' . $path);
                 return false;
             }
-        
+
             $this->driver->deleteMatchingObjects($this->bucket, $path);
         } catch (Exception $e) {
             $this->xpdo->log(xPDO::LOG_LEVEL_ERROR, '[AWS S3 MS] Error occurred when deleting container: ' . $e->getMessage());
@@ -1209,7 +1217,7 @@ class AwsS3MediaSource extends modMediaSource implements modMediaSourceInterface
                 $this->addError('file', $this->xpdo->lexicon('file_folder_err_ae') . ': ' . $key);
                 return false;
             }
-        
+
             $this->driver->putObject([
                 'Bucket' => $this->bucket,
                 'Key' => $key,
@@ -1275,10 +1283,10 @@ class AwsS3MediaSource extends modMediaSource implements modMediaSourceInterface
                 $this->addError('file', $this->xpdo->lexicon('file_folder_err_ns') . ': ' . $oldPath);
                 return false;
             }
-    
+
             $dir = dirname($oldPath);
             $newPath = ($dir != '.' ? $dir . '/' : '') . $newName;
-        
+
             $this->driver->copyObject([
                 'ACL' => 'public-read',
                 'Bucket' => $this->bucket,
@@ -1404,14 +1412,14 @@ class AwsS3MediaSource extends modMediaSource implements modMediaSourceInterface
     {
         $path = $this->cleanKey($path);
         $path = ltrim($path, '/');
-        
+
         try {
             $exists = $this->driver->doesObjectExist($this->bucket, $path);
             if (!$exists) {
                 $this->addError('file', $this->xpdo->lexicon('file_folder_err_ns') . ': ' . $path);
                 return false;
             }
-        
+
             $this->driver->deleteObject([
                 'Bucket' => $this->bucket,
                 'Key' => $path
@@ -1487,6 +1495,14 @@ class AwsS3MediaSource extends modMediaSource implements modMediaSourceInterface
     public function getDefaultProperties()
     {
         return array(
+            'endpoint' => array(
+                'name' => 'endpoint',
+                'desc' => 'prop_s3.endpoint_desc',
+                'type' => 'textfield',
+                'options' => '',
+                'value' => '',
+                'lexicon' => 'awss3mediasource:default',
+            ),
             'url' => array(
                 'name' => 'url',
                 'desc' => 'prop_s3.url_desc',
@@ -1517,7 +1533,7 @@ class AwsS3MediaSource extends modMediaSource implements modMediaSourceInterface
                 'type' => 'textfield',
                 'options' => '',
                 'value' => '',
-                'lexicon' => 'awss3mediasource:source',
+                'lexicon' => 'awss3mediasource:default',
             ),
             'key' => array(
                 'name' => 'key',
