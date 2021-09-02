@@ -474,11 +474,13 @@ class AwsS3MediaSource extends modMediaSource implements modMediaSourceInterface
                 $thumbWidth = $this->ctx->getOption('filemanager_thumb_width', 100);
                 $thumbHeight = $this->ctx->getOption('filemanager_thumb_height', 80);
 
+                /* Drop this for performance
+                breaks image size output, but MUCH more stable
                 $size = @getimagesize($url);
                 if (is_array($size)) {
                     $imageWidth = $size[0] > 800 ? 800 : $size[0];
                     $imageHeight = $size[1] > 600 ? 600 : $size[1];
-                }
+                }*/
 
                 if ($thumbWidth > $imageWidth) $thumbWidth = $imageWidth;
                 if ($thumbHeight > $imageHeight) $thumbHeight = $imageHeight;
