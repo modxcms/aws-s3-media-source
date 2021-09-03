@@ -115,6 +115,7 @@ class AwsS3MediaSource extends modMediaSource implements modMediaSourceInterface
         $useMultiByte = $this->ctx->getOption('use_multibyte', false);
         $encoding = $this->ctx->getOption('modx_charset', 'UTF-8');
         $hideTooltips = !empty($this->properties['hideTooltips']) && $this->properties['hideTooltips'] != 'false' ? true : false;
+        $hideFiles = !empty($this->properties['hideFiles']) && $this->properties['hideFiles'] != 'false' ? true : false; 
 
         $imageExtensions = $this->getOption('imageExtensions', $this->properties, 'jpg,jpeg,png,gif');
         $imageExtensions = explode(',', $imageExtensions);
@@ -150,46 +151,49 @@ class AwsS3MediaSource extends modMediaSource implements modMediaSourceInterface
             $directories[$currentPath]['menu'] = array('items' => $this->getDirectoriesContextMenu());
         }
 
-        foreach ($listFiles as $idx => $currentPath) {
-            if ($currentPath == $path) continue;
+        //Skip if media browser file tree
+        if(!$hideFiles){
+            foreach ($listFiles as $idx => $currentPath) {
+                if ($currentPath == $path) continue;
 
-            $fileName = basename($currentPath);
+                $fileName = basename($currentPath);
 
-            $ext = pathinfo($fileName, PATHINFO_EXTENSION);
-            $ext = $useMultiByte ? mb_strtolower($ext, $encoding) : strtolower($ext);
+                $ext = pathinfo($fileName, PATHINFO_EXTENSION);
+                $ext = $useMultiByte ? mb_strtolower($ext, $encoding) : strtolower($ext);
 
-            $cls = array();
+                $cls = array();
 
-            $encoded = explode('/', $currentPath);
-            $encoded = array_map('urlencode', $encoded);
-            $encoded = implode('/', $encoded);
-            $encoded = rtrim($this->properties['url'], '/') . '/' . $encoded;
+                $encoded = explode('/', $currentPath);
+                $encoded = array_map('urlencode', $encoded);
+                $encoded = implode('/', $encoded);
+                $encoded = rtrim($this->properties['url'], '/') . '/' . $encoded;
 
-            $url = rtrim($this->properties['url'], '/') . '/' . $currentPath;
-            $page = '?a=' . $editAction . '&file=' . $currentPath . '&wctx=' . $this->ctx->get('key') . '&source=' . $this->get('id');
+                $url = rtrim($this->properties['url'], '/') . '/' . $currentPath;
+                $page = '?a=' . $editAction . '&file=' . $currentPath . '&wctx=' . $this->ctx->get('key') . '&source=' . $this->get('id');
 
-            if ($this->hasPermission('file_remove')) $cls[] = 'premove';
-            if ($this->hasPermission('file_update')) $cls[] = 'pupdate';
+                if ($this->hasPermission('file_remove')) $cls[] = 'premove';
+                if ($this->hasPermission('file_update')) $cls[] = 'pupdate';
 
-            $fileNames[] = strtoupper($fileName);
-            $files[$currentPath] = array(
-                'id' => $currentPath,
-                'text' => $fileName,
-                'cls' => implode(' ', $cls),
-                'iconCls' => 'icon icon-file icon-' . $ext,
-                'type' => 'file',
-                'leaf' => true,
-                'path' => $currentPath,
-                'page' => $this->isBinary($encoded) ? $page : null,
-                'pathRelative' => $url,
-                'directory' => $currentPath,
-                'url' => $url,
-                'file' => $currentPath,
-            );
-            $files[$currentPath]['menu'] = array('items' => $this->getFilesContextMenu($files[$currentPath]));
+                $fileNames[] = strtoupper($fileName);
+                $files[$currentPath] = array(
+                    'id' => $currentPath,
+                    'text' => $fileName,
+                    'cls' => implode(' ', $cls),
+                    'iconCls' => 'icon icon-file icon-' . $ext,
+                    'type' => 'file',
+                    'leaf' => true,
+                    'path' => $currentPath,
+                    'page' => $this->isBinary($encoded) ? $page : null,
+                    'pathRelative' => $url,
+                    'directory' => $currentPath,
+                    'url' => $url,
+                    'file' => $currentPath,
+                );
+                $files[$currentPath]['menu'] = array('items' => $this->getFilesContextMenu($files[$currentPath]));
 
-            if (!$hideTooltips) {
-                $files[$currentPath]['qtip'] = in_array($ext, $imageExtensions) ? '<img src="' . $url . '" alt="' . $fileName . '" />' : '';
+                if (!$hideTooltips) {
+                    $files[$currentPath]['qtip'] = in_array($ext, $imageExtensions) ? '<img src="' . $url . '" alt="' . $fileName . '" />' : '';
+                }
             }
         }
 
