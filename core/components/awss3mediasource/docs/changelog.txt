@@ -1,3 +1,10 @@
+### 1.1.0
+- Add PHP 8 support
+- Upgrade Composer dependencies
+
+### 1.0.0
+- Initial MODX Public Release
+
 ### 0.11.0
 - Add an endpoint as a property
 - Trim leading slash from $path
