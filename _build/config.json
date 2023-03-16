@@ -3,7 +3,7 @@
   "lowCaseName": "awss3mediasource",
   "description": "AWS S3 Media Source 3.0",
   "author": "John Peca",
-  "version": "0.11.0",
+  "version": "0.12.0",
   "package": {},
   "database": {
     "tables": ["AwsS3MediaSource"]

@@ -1,6 +1,6 @@
 {
   "require": {
-    "aws/aws-sdk-php": "3.*",
-    "league/climate": "^3.2"
+    "aws/aws-sdk-php": "^3.261",
+    "league/climate": "^3.8"
   }
 }
