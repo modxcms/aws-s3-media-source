@@ -1,5 +1,7 @@
 <?php
 
+ini_set('max_execution_time', 120);
+
 if (!class_exists('modMediaSource')) {
     require MODX_CORE_PATH . 'model/modx/sources/modmediasource.class.php';
 }
@@ -336,19 +338,7 @@ class AwsS3MediaSource extends modMediaSource implements modMediaSourceInterface
      */
     public function isBinary($file, $isContent = false)
     {
-        if (!$isContent) {
-            $fh = @fopen($file, 'r');
-            $blk = @fread($fh, 512);
-
-            @fclose($fh);
-            @clearstatcache();
-
-            return (substr_count($blk, "^ -~" /*. "^\r\n"*/) / 512 > 0.3) || (substr_count($blk, "\x00") > 0) ? false : true;
-        }
-
-        $content = str_replace(array("\n", "\r", "\t"), '', $file);
-
-        return ctype_print($content) ? false : true;
+        return false;
     }
 
     /**
