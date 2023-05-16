@@ -4,7 +4,19 @@
   "description": "AWS S3 Media Source 3.0",
   "author": "John Peca",
   "version": "1.2.0-pl",
-  "package": {},
+  "package": {
+    "elements": {
+      "plugins": [
+        {
+          "name": "AWSS3Fred",
+          "file": "AWSS3Fred.php",
+          "events": [
+            "FredOnElfinderRoots"
+          ]
+        }
+      ]
+    }
+  },
   "database": {
     "tables": ["AwsS3MediaSource"]
   },
