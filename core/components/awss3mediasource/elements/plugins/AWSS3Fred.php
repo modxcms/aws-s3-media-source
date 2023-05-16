@@ -70,7 +70,7 @@ switch ($modx->event->name) {
                     $params->roots[] = [
                         'id' => 'ms' . $mediaSource->id,
                         'driver' => 'AwsS3Flysystem',
-                        'alias' => 'AwsS3',
+                        'alias' => $mediaSource->name,
                         'filesystem' => new League\Flysystem\Filesystem($adapter),
                         'URL' => $awsUrl,
                         'tmbURL' => 'self',
