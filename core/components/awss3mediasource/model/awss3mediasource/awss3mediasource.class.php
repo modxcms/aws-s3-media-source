@@ -227,10 +227,11 @@ class AwsS3MediaSource extends modMediaSource implements modMediaSourceInterface
         }
 
         try {
-            $result = $this->driver->listObjects([
+            $result = $this->driver->listObjectsV2([
                 'Bucket' => $this->bucket,
                 'Prefix' => ltrim($dir, '/'),
-                'Delimiter' => '/'
+                'Delimiter' => '/',
+                'MaxKeys' => 9999,
             ]);
         } catch (Exception $e) {
             $this->xpdo->log(xPDO::LOG_LEVEL_ERROR, '[AWS S3 MS] ' . $e->getMessage());
