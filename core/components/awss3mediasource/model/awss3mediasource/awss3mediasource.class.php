@@ -107,7 +107,7 @@ class AwsS3MediaSource extends modMediaSource implements modMediaSourceInterface
     public function getContainerList($path)
     {
         /** Need to check for the root or first loaded Media Source to add the proper baseDir if set. */
-        if ( empty(trim($path, '/'))) {
+        if (empty(trim($path, '/'))) {
             $base_dir = $this->xpdo->getOption('baseDir', $this->properties, '');
             $path = trim($base_dir, '/') . '/' . ltrim($path, '/');
         }
@@ -117,7 +117,7 @@ class AwsS3MediaSource extends modMediaSource implements modMediaSourceInterface
         $useMultiByte = $this->ctx->getOption('use_multibyte', false);
         $encoding = $this->ctx->getOption('modx_charset', 'UTF-8');
         $hideTooltips = !empty($this->properties['hideTooltips']) && $this->properties['hideTooltips'] != 'false' ? true : false;
-        $hideFiles = !empty($this->properties['hideFiles']) && $this->properties['hideFiles'] != 'false' ? true : false; 
+        $hideFiles = !empty($this->properties['hideFiles']) && $this->properties['hideFiles'] != 'false' ? true : false;
 
         $imageExtensions = $this->getOption('imageExtensions', $this->properties, 'jpg,jpeg,png,gif');
         $imageExtensions = explode(',', $imageExtensions);
@@ -128,7 +128,9 @@ class AwsS3MediaSource extends modMediaSource implements modMediaSourceInterface
         $fileNames = array();
 
         foreach ($listDirectories as $idx => $currentPath) {
-            if ($currentPath == $path) continue;
+            if ($currentPath == $path) {
+                continue;
+            }
 
             $fileName = basename($currentPath);
             $dirNames[] = strtoupper($fileName);
@@ -154,9 +156,11 @@ class AwsS3MediaSource extends modMediaSource implements modMediaSourceInterface
         }
 
         //Skip if media browser file tree
-        if(!$hideFiles){
+        if(!$hideFiles) {
             foreach ($listFiles as $idx => $currentPath) {
-                if ($currentPath == $path) continue;
+                if ($currentPath == $path) {
+                    continue;
+                }
 
                 $fileName = basename($currentPath);
 
@@ -173,8 +177,12 @@ class AwsS3MediaSource extends modMediaSource implements modMediaSourceInterface
                 $url = rtrim($this->properties['url'], '/') . '/' . $currentPath;
                 $page = '?a=' . $editAction . '&file=' . $currentPath . '&wctx=' . $this->ctx->get('key') . '&source=' . $this->get('id');
 
-                if ($this->hasPermission('file_remove')) $cls[] = 'premove';
-                if ($this->hasPermission('file_update')) $cls[] = 'pupdate';
+                if ($this->hasPermission('file_remove')) {
+                    $cls[] = 'premove';
+                }
+                if ($this->hasPermission('file_update')) {
+                    $cls[] = 'pupdate';
+                }
 
                 $fileNames[] = strtoupper($fileName);
                 $files[$currentPath] = array(
@@ -227,11 +235,10 @@ class AwsS3MediaSource extends modMediaSource implements modMediaSourceInterface
         }
 
         try {
-            $result = $this->driver->listObjectsV2([
+            $resultPaginator = $this->driver->getPaginator('ListObjectsV2', [
                 'Bucket' => $this->bucket,
                 'Prefix' => ltrim($dir, '/'),
                 'Delimiter' => '/',
-                'MaxKeys' => 9999,
             ]);
         } catch (Exception $e) {
             $this->xpdo->log(xPDO::LOG_LEVEL_ERROR, '[AWS S3 MS] ' . $e->getMessage());
@@ -240,18 +247,19 @@ class AwsS3MediaSource extends modMediaSource implements modMediaSourceInterface
 
         $directories = [];
         $files = [];
-
-        $prefixes = $result->get('CommonPrefixes');
-        if ( is_array($prefixes) ) {
-            foreach ($prefixes as $folder) {
-                $directories[] = $folder['Prefix'];
+        foreach ($resultPaginator as $result) {
+            $prefixes = $result->get('CommonPrefixes');
+            if (is_array($prefixes)) {
+                foreach ($prefixes as $folder) {
+                    $directories[] = $folder['Prefix'];
+                }
             }
-        }
 
-        $contents = $result->get('Contents');
-        if ( is_array($contents)) {
-            foreach ($contents as $file) {
-                $files[] = $file['Key'];
+            $contents = $result->get('Contents');
+            if (is_array($contents)) {
+                foreach ($contents as $file) {
+                    $files[] = $file['Key'];
+                }
             }
         }
 
@@ -284,7 +292,7 @@ class AwsS3MediaSource extends modMediaSource implements modMediaSourceInterface
             ];
         }
 
-        if ($this->hasPermission('directory_update') && $this->getOption('allowFolderCopy', $this->properties, false) ) {//&& $this->checkPolicy('save')) {
+        if ($this->hasPermission('directory_update') && $this->getOption('allowFolderCopy', $this->properties, false)) {//&& $this->checkPolicy('save')) {
             $menu[] = [
                 'text' => $this->xpdo->lexicon('rename'),
                 'handler' => 'this.renameDirectory',
@@ -379,7 +387,9 @@ class AwsS3MediaSource extends modMediaSource implements modMediaSourceInterface
         }
 
         if ($this->hasPermission('file_remove')) {
-            if (!empty($menu)) $menu[] = '-';
+            if (!empty($menu)) {
+                $menu[] = '-';
+            }
 
             $menu[] = [
                 'text' => $this->xpdo->lexicon('file_remove'),
@@ -401,7 +411,7 @@ class AwsS3MediaSource extends modMediaSource implements modMediaSourceInterface
     {
         $properties = $this->getPropertyList();
         /** Need to check for the root/parent of Media Source to add the proper baseDir if set. */
-        if ( empty(trim($path, '/'))) {
+        if (empty(trim($path, '/'))) {
             $base_dir = $this->xpdo->getOption('baseDir', $this->properties, '');
             $path = trim($base_dir, '/') . '/' ;
         }
@@ -430,8 +440,12 @@ class AwsS3MediaSource extends modMediaSource implements modMediaSourceInterface
         $fileNames = array();
 
         foreach ($listFiles as $idx => $currentPath) {
-            if ($currentPath == $path) continue;
-            if (in_array($currentPath, $skipFiles)) continue;
+            if ($currentPath == $path) {
+                continue;
+            }
+            if (in_array($currentPath, $skipFiles)) {
+                continue;
+            }
 
             $url = $bucketUrl . trim($currentPath, '/');
             $fileName = basename($currentPath);
@@ -461,7 +475,9 @@ class AwsS3MediaSource extends modMediaSource implements modMediaSourceInterface
             $fileArray['ext'] = $use_multibyte ? mb_strtolower($fileArray['ext'], $encoding) : strtolower($fileArray['ext']);
             $fileArray['cls'] = 'icon-' . $fileArray['ext'];
 
-            if (!empty($allowedFileTypes) && !in_array($fileArray['ext'], $allowedFileTypes)) continue;
+            if (!empty($allowedFileTypes) && !in_array($fileArray['ext'], $allowedFileTypes)) {
+                continue;
+            }
 
             if (in_array($fileArray['ext'], $imageExtensions)) {
                 $imageWidth = $this->ctx->getOption('filemanager_image_width', 400);
@@ -477,8 +493,12 @@ class AwsS3MediaSource extends modMediaSource implements modMediaSourceInterface
                     $imageHeight = $size[1] > 600 ? 600 : $size[1];
                 }*/
 
-                if ($thumbWidth > $imageWidth) $thumbWidth = $imageWidth;
-                if ($thumbHeight > $imageHeight) $thumbHeight = $imageHeight;
+                if ($thumbWidth > $imageWidth) {
+                    $thumbWidth = $imageWidth;
+                }
+                if ($thumbHeight > $imageHeight) {
+                    $thumbHeight = $imageHeight;
+                }
 
                 $thumbQuery = http_build_query(array(
                     'src' => $url,
@@ -506,7 +526,7 @@ class AwsS3MediaSource extends modMediaSource implements modMediaSourceInterface
                 $fileArray['thumb_width'] = $thumbWidth;
                 $fileArray['thumb_height'] = $thumbHeight;
 
-//                $fileArray['image'] = $this->ctx->getOption('connectors_url', MODX_CONNECTORS_URL).'system/phpthumb.php?'.urldecode($imageQuery);
+                //                $fileArray['image'] = $this->ctx->getOption('connectors_url', MODX_CONNECTORS_URL).'system/phpthumb.php?'.urldecode($imageQuery);
                 $fileArray['image'] = $url;
                 $fileArray['image_width'] = is_array($size) ? $size[0] : $imageWidth;
                 $fileArray['image_height'] = is_array($size) ? $size[1] : $imageHeight;
@@ -545,7 +565,7 @@ class AwsS3MediaSource extends modMediaSource implements modMediaSourceInterface
     public function createContainer($name, $parentContainer)
     {
         /** Need to check for the root/parent of Media Source to add the proper baseDir if set. */
-        if ( empty(trim($parentContainer, '/'))) {
+        if (empty(trim($parentContainer, '/'))) {
             $base_dir = $this->xpdo->getOption('baseDir', $this->properties, '');
             $parentContainer = trim($base_dir, '/') . '/' ;
         }
@@ -618,7 +638,7 @@ class AwsS3MediaSource extends modMediaSource implements modMediaSourceInterface
             }
             $use_batch = false;
             // Copy the main object, single:
-            if ( $use_batch ) {
+            if ($use_batch) {
                 $this->driver->copyObject(array(
                     'Bucket' => $this->bucket,
                     'Key' => $new_key,
@@ -650,7 +670,7 @@ class AwsS3MediaSource extends modMediaSource implements modMediaSourceInterface
                 }
             }
             //$this->xpdo->logManagerAction('directory_copy', '', $path);
-            if ( $delete ) {
+            if ($delete) {
                 // delete the folder:
                 return $this->removeContainer($oldPath);
             }
@@ -676,7 +696,7 @@ class AwsS3MediaSource extends modMediaSource implements modMediaSourceInterface
     protected function copyDirectory($key, $new_key, $batch=false, $batch_commands=array())
     {
         // copy the folder object:
-        if ( $batch ) {
+        if ($batch) {
             $batch_commands[] = $this->driver->getCommand('CopyObject', array(
                 'Bucket' => $this->driver,
                 'Key' => "{$new_key}",
@@ -695,17 +715,21 @@ class AwsS3MediaSource extends modMediaSource implements modMediaSourceInterface
         // copy child directories:
         foreach ($listDirectories as $idx => $child_key) {
             // folder/child/ to
-            if ($child_key == $key) continue;
+            if ($child_key == $key) {
+                continue;
+            }
 
             $new_child_key = substr_replace($child_key, $new_key, 0, strlen($key));
             $batch_commands = $this->copyDirectory($child_key, $new_child_key, $batch, $batch_commands);
         }
         // copy files:
         foreach ($listFiles as $idx => $child_key) {
-            if ($child_key == $key) continue;
+            if ($child_key == $key) {
+                continue;
+            }
 
             $new_child_key = substr_replace($child_key, $new_key, 0, strlen($key));
-            if ( $batch ) {
+            if ($batch) {
                 $batch_commands[] = $this->driver->getCommand('CopyObject', array(
                     'Bucket' => $this->driver,
                     'Key' => "{$new_child_key}",
@@ -790,9 +814,11 @@ class AwsS3MediaSource extends modMediaSource implements modMediaSourceInterface
      */
     public function transferObjects($fromSource, $from_path, $cli=false, $object_type='file', $container='', $method='copy')
     {
-        if ($container == '/' || $container == '.') $container = '';
+        if ($container == '/' || $container == '.') {
+            $container = '';
+        }
 
-        if ( $object_type == 'file') {
+        if ($object_type == 'file') {
             $file = $fromSource->getObjectContents($from_path);
             $new_path = $container;
 
@@ -804,11 +830,11 @@ class AwsS3MediaSource extends modMediaSource implements modMediaSourceInterface
                 /* verify file exists and is writable */
                 if (!$remove_file->exists()) {
                     $error = $this->xpdo->lexicon('file_err_nf').': '.$remove_file->getPath();
-                } else if (!$remove_file->isReadable() || !$remove_file->isWritable()) {
+                } elseif (!$remove_file->isReadable() || !$remove_file->isWritable()) {
                     $error = $this->xpdo->lexicon('file_err_perms_remove');
-                } else if (!($remove_file instanceof modFile)) {
+                } elseif (!($remove_file instanceof modFile)) {
                     $error = $this->xpdo->lexicon('file_err_invalid');
-                } else if (!$remove_file->remove()) {
+                } elseif (!$remove_file->remove()) {
                     $error = $this->xpdo->lexicon('file_err_remove');
                 }
 
@@ -819,10 +845,10 @@ class AwsS3MediaSource extends modMediaSource implements modMediaSourceInterface
             }
         } else {
             $list = $fromSource->getContainerList($from_path);
-            if ( count($list) > 0) {
+            if (count($list) > 0) {
                 foreach ($list as $object) {
                     $new_dir = rtrim($container, '/').'/';
-                    if ( $object['type'] == 'dir' ) {
+                    if ($object['type'] == 'dir') {
                         // recursion:
                         $new_dir = ltrim($new_dir.basename($object['id']), '/');
 
@@ -840,11 +866,11 @@ class AwsS3MediaSource extends modMediaSource implements modMediaSourceInterface
                         /* verify file exists and is writable */
                         if (!$remove_file->exists()) {
                             $error = $this->xpdo->lexicon('file_err_nf').': '.$remove_file->getPath();
-                        } else if (!$remove_file->isReadable() || !$remove_file->isWritable()) {
+                        } elseif (!$remove_file->isReadable() || !$remove_file->isWritable()) {
                             $error = $this->xpdo->lexicon('file_err_perms_remove');
-                        } else if (!($remove_file instanceof modFile)) {
+                        } elseif (!($remove_file instanceof modFile)) {
                             $error = $this->xpdo->lexicon('file_err_invalid');
-                        } else if (!$remove_file->remove()) {
+                        } elseif (!$remove_file->remove()) {
                             $error = $this->xpdo->lexicon('file_err_remove');
                         }
 
@@ -884,7 +910,7 @@ class AwsS3MediaSource extends modMediaSource implements modMediaSourceInterface
             ]);
             // if index.html:
             $org_file_name = @pathinfo($new_path, PATHINFO_BASENAME);
-            if ( $org_file_name == 'index.html' || $org_file_name == 'index.htm') {
+            if ($org_file_name == 'index.html' || $org_file_name == 'index.htm') {
                 // make it the root:
                 $cli->out('Make Index: '.ucfirst($method).' file from: '.$source_file.' to '.substr($new_path, 0, strlen($new_path) - strlen($org_file_name)).' ');
                 $this->transferFile($source_file, substr($new_path, 0, strlen($new_path) - strlen($org_file_name)), $cli, $method);
@@ -911,7 +937,9 @@ class AwsS3MediaSource extends modMediaSource implements modMediaSourceInterface
      */
     public function uploadObjectsToContainer($container, array $files = array())
     {
-        if ($container == '/' || $container == '.') $container = '';
+        if ($container == '/' || $container == '.') {
+            $container = '';
+        }
         $container = ltrim(trim($this->xpdo->getOption('baseDir', $this->properties, ''), '/') . '/'.$container, '/');
 
         $allowedFileTypes = explode(',', $this->xpdo->getOption('upload_files', null, ''));
@@ -920,8 +948,12 @@ class AwsS3MediaSource extends modMediaSource implements modMediaSourceInterface
         $maxFileSize = $this->xpdo->getOption('upload_maxsize', null, 1048576);
 
         foreach ($files as $file) {
-            if ($file['error'] != 0) continue;
-            if (empty($file['name'])) continue;
+            if ($file['error'] != 0) {
+                continue;
+            }
+            if (empty($file['name'])) {
+                continue;
+            }
             $ext = @pathinfo($file['name'], PATHINFO_EXTENSION);
             $ext = strtolower($ext);
 
@@ -963,7 +995,9 @@ class AwsS3MediaSource extends modMediaSource implements modMediaSourceInterface
             }
         }
 
-        if ($this->hasErrors() == true) return false;
+        if ($this->hasErrors() == true) {
+            return false;
+        }
 
         /* invoke event */
         $this->xpdo->invokeEvent('OnFileManagerUpload', array(
@@ -1195,7 +1229,7 @@ class AwsS3MediaSource extends modMediaSource implements modMediaSourceInterface
     public function createObject($path, $name, $content)
     {
         /** Need to check for the root/parent of Media Source to add the proper baseDir if set. */
-        if ( empty(trim($path, '/'))) {
+        if (empty(trim($path, '/'))) {
             $base_dir = $this->xpdo->getOption('baseDir', $this->properties, '');
             if (!empty(trim($base_dir, '/'))) {
                 $path = trim($base_dir, '/') . '/' ;
@@ -1618,7 +1652,8 @@ class AwsS3MediaSource extends modMediaSource implements modMediaSourceInterface
         return $url . '/' . ltrim(str_replace($url, '', $object), '/');
     }
 
-    public function doesObjectExist($bucket, $name) {
+    public function doesObjectExist($bucket, $name)
+    {
         return $this->driver->doesObjectExist($bucket, $name);
     }
 }
