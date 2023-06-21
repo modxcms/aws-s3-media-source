@@ -347,6 +347,33 @@ class AwsS3MediaSource extends modMediaSource implements modMediaSourceInterface
      */
     public function isBinary($file, $isContent = false)
     {
+        $binary_extensions = [
+            'css',
+            'csv',
+            'htm',
+            'html',
+            'ics',
+            'ini',
+            'js',
+            'json',
+            'less',
+            'log',
+            'md',
+            'mjs',
+            'php',
+            'sh',
+            'scss',
+            'sql',
+            'tpl',
+            'tsv',
+            'txt',
+            'xml',
+        ];
+        foreach ($binary_extensions as $a) {
+            if (stripos($file, $a) !== false) {
+                return true;
+            }
+        }
         return false;
     }
 
@@ -381,8 +408,8 @@ class AwsS3MediaSource extends modMediaSource implements modMediaSourceInterface
 
         if ($this->hasPermission('file_view')) {
             $menu[] = [
-                'text' => $this->xpdo->lexicon('file_download'),
-                'handler' => 'this.downloadFile',
+                'text' => $this->xpdo->lexicon('file_copy_path'),
+                'handler' => 'this.copyRelativePath',
             ];
         }
 
@@ -456,8 +483,6 @@ class AwsS3MediaSource extends modMediaSource implements modMediaSourceInterface
             $encoded = rtrim($this->properties['url'], '/') . '/' . $encoded;
 
             $page = '?a=' . $editAction . '&file=' . $currentPath . '&wctx=' . $this->ctx->get('key') . '&source=' . $this->get('id');
-
-            $fileNames[] = strtoupper($fileName);
             $fileArray = array(
                 'id' => $currentPath,
                 'name' => $fileName,
@@ -479,19 +504,13 @@ class AwsS3MediaSource extends modMediaSource implements modMediaSourceInterface
                 continue;
             }
 
+            $fileNames[] = strtoupper($fileName);
+
             if (in_array($fileArray['ext'], $imageExtensions)) {
                 $imageWidth = $this->ctx->getOption('filemanager_image_width', 400);
                 $imageHeight = $this->ctx->getOption('filemanager_image_height', 300);
                 $thumbWidth = $this->ctx->getOption('filemanager_thumb_width', 100);
                 $thumbHeight = $this->ctx->getOption('filemanager_thumb_height', 80);
-
-                /* Drop this for performance
-                breaks image size output, but MUCH more stable
-                $size = @getimagesize($url);
-                if (is_array($size)) {
-                    $imageWidth = $size[0] > 800 ? 800 : $size[0];
-                    $imageHeight = $size[1] > 600 ? 600 : $size[1];
-                }*/
 
                 if ($thumbWidth > $imageWidth) {
                     $thumbWidth = $imageWidth;
@@ -511,31 +530,18 @@ class AwsS3MediaSource extends modMediaSource implements modMediaSourceInterface
                     'source' => $this->get('id'),
                 ));
 
-                $imageQuery = http_build_query(array(
-                    'src' => $url,
-                    'w' => $imageWidth,
-                    'h' => $imageHeight,
-                    'HTTP_MODAUTH' => $modAuth,
-                    'f' => $thumbnailType,
-                    'q' => $thumbnailQuality,
-                    'wctx' => $this->ctx->get('key'),
-                    'source' => $this->get('id'),
-                ));
-
                 $fileArray['thumb'] = $this->ctx->getOption('connectors_url', MODX_CONNECTORS_URL).'system/phpthumb.php?'.urldecode($thumbQuery);
                 $fileArray['thumb_width'] = $thumbWidth;
                 $fileArray['thumb_height'] = $thumbHeight;
 
-                //                $fileArray['image'] = $this->ctx->getOption('connectors_url', MODX_CONNECTORS_URL).'system/phpthumb.php?'.urldecode($imageQuery);
                 $fileArray['image'] = $url;
-                $fileArray['image_width'] = is_array($size) ? $size[0] : $imageWidth;
-                $fileArray['image_height'] = is_array($size) ? $size[1] : $imageHeight;
 
                 $fileArray['preview'] = 1;
             } else {
                 $fileArray['thumb'] = $fileArray['image'] = $this->ctx->getOption('manager_url', MODX_MANAGER_URL).'templates/default/images/restyle/nopreview.jpg';
                 $fileArray['thumb_width'] = $fileArray['image_width'] = $this->ctx->getOption('filemanager_thumb_width', 100);
                 $fileArray['thumb_height'] = $fileArray['image_height'] = $this->ctx->getOption('filemanager_thumb_height', 80);
+
                 $fileArray['preview'] = 0;
             }
 
@@ -1505,7 +1511,7 @@ class AwsS3MediaSource extends modMediaSource implements modMediaSourceInterface
         }
 
         $contents = $object->get('Body')->getContents();
-        $isBinary = $this->isBinary($contents, true);
+        $isBinary = $this->isBinary($objectPath);
         return [
             'name' => $objectPath,
             'basename' => basename($objectPath),
@@ -1513,9 +1519,9 @@ class AwsS3MediaSource extends modMediaSource implements modMediaSourceInterface
             'size' => $object->get('ContentLength'),
             'last_accessed' => '',
             'last_modified' => $lastModified,
-            'content' => !$isBinary ? $contents : '',
+            'content' => $isBinary ? $contents : '',
             'image' => in_array($fileExtension, $imageExtensions) ? true : false,
-            'is_writable' => !$isBinary,
+            'is_writable' => $isBinary,
             'is_readable' => true,
         ];
     }
