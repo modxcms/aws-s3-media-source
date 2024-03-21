@@ -2,7 +2,9 @@
   "require": {
     "aws/aws-sdk-php": "^3.269",
     "league/climate": "^3.8",
-    "santhapa/elfinder-aws-s3": "^1.0"
+    "santhapa/elfinder-aws-s3": "^1.0",
+    "guzzlehttp/guzzle": "^7.8",
+    "guzzlehttp/promises": "^2.0.1"
   },
   "config": {
     "platform": {
