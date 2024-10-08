@@ -224,33 +224,42 @@ class AwsS3MediaSource extends modMediaSource implements modMediaSourceInterface
             $c['prefix'] = $dir;
         }
 
-        try {
-            $result = $this->driver->listObjects([
-                'Bucket' => $this->bucket,
-                'Prefix' => ltrim($dir, '/'),
-                'Delimiter' => '/'
-            ]);
-        } catch (Exception $e) {
-            $this->xpdo->log(xPDO::LOG_LEVEL_ERROR, '[AWS S3 MS] ' . $e->getMessage());
-            return [[], []];
-        }
-
         $directories = [];
         $files = [];
 
-        $prefixes = $result->get('CommonPrefixes');
-        if ( is_array($prefixes) ) {
-            foreach ($prefixes as $folder) {
-                $directories[] = $folder['Prefix'];
+        $continuationToken = null;
+        do {
+            $params = [
+                'Bucket' => $this->bucket,
+                'Prefix' => ltrim($dir, '/'),
+                'Delimiter' => '/',
+            ];
+            if ($continuationToken) {
+                $params['ContinuationToken'] = $continuationToken;
             }
-        }
+            try {
+                $result = $this->driver->listObjectsV2($params);
+            } catch (Exception $e) {
+                $this->xpdo->log(xPDO::LOG_LEVEL_ERROR, '[AWS S3 MS] ' . $e->getMessage());
+                return [[], []];
+            }
 
-        $contents = $result->get('Contents');
-        if ( is_array($contents)) {
-            foreach ($contents as $file) {
-                $files[] = $file['Key'];
+            $prefixes = $result->get('CommonPrefixes');
+            if (is_array($prefixes)) {
+                foreach ($prefixes as $folder) {
+                    $directories[] = $folder['Prefix'];
+                }
             }
-        }
+
+            $contents = $result->get('Contents');
+            if (is_array($contents)) {
+                foreach ($contents as $file) {
+                    $files[] = $file['Key'];
+                }
+            }
+
+            $continuationToken = isset($result['NextContinuationToken']) ? $result['NextContinuationToken'] : null;
+        } while ($continuationToken);
 
         return [$files, $directories];
     }
