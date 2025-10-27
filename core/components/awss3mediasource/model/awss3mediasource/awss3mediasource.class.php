@@ -1248,6 +1248,10 @@ class AwsS3MediaSource extends modMediaSource implements modMediaSourceInterface
         $key = $path . $name;
         $this->xpdo->log(xPDO::LOG_LEVEL_ERROR, 'Key ' . $key);
 
+        $ext = @pathinfo((rtrim($path, '/')) . '/'. $name, PATHINFO_EXTENSION);
+
+        $contentType = $this->getContentType($ext);
+
         try {
             $exists = $this->driver->doesObjectExist($this->bucket, $key);
             if ($exists) {
@@ -1259,7 +1263,8 @@ class AwsS3MediaSource extends modMediaSource implements modMediaSourceInterface
                 'Bucket' => $this->bucket,
                 'Key' => $key,
                 'ACL' => 'public-read',
-                'Body' => $content
+                'Body' => $content,
+                'ContentType' => $contentType
             ]);
         } catch (Exception $e) {
             $this->addError('name', $this->xpdo->lexicon('file_err_create') . $key);
