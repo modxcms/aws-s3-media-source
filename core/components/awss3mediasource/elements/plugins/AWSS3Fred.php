@@ -1,4 +1,5 @@
 <?php
+
 switch ($modx->event->name) {
     case 'FredOnElfinderRoots':
         $params = $modx->getOption('params', $scriptProperties);
@@ -24,6 +25,8 @@ switch ($modx->event->name) {
         $c->where($where);
 
         /** @var \modFileMediaSource[] $mediaSources */
+        $corePath = $this->xpdo->getOption('awss3mediasource.core_path', null, $this->xpdo->getOption('core_path', null, MODX_CORE_PATH) . 'components/awss3mediasource/');
+        $modelPath = $corePath . 'model/awss3mediasource/';
         $mediaSources = $modx->getIterator('modMediaSource', $c);
         foreach ($mediaSources as $mediaSource) {
             $mediaSource->initialize();
@@ -62,18 +65,21 @@ switch ($modx->event->name) {
                         $modx->log(modX::LOG_LEVEL_ERROR, '[AWSS3MediaSource] Bucket does not exist: ' . $bucket);
                         continue;
                     }
-                    $adapter = new League\Flysystem\AwsS3V3\AwsS3V3Adapter(
+                    $adapter = new League\Flysystem\AwsS3V3\AwsS3V3Adapter (
                         new Aws\S3\S3Client($config),
                         $bucket,
-                        $path
+                        $path,
                     );
+                    class_alias(\AwsS3Mediasource\elFinderVolumeFlysystem::class, 'elFinderVolumeFlysystem');
                     $params->roots[] = [
                         'id' => 'ms' . $mediaSource->id,
-                        'driver' => 'AwsS3Flysystem',
+                        'driver' => 'Flysystem',
                         'alias' => $mediaSource->name,
                         'filesystem' => new League\Flysystem\Filesystem($adapter),
                         'URL' => $awsUrl,
                         'tmbURL' => 'self',
+                        'mimeDetect' => 'internal',
+                        'checkSubfolders' => false,
                     ];
                 } catch (Exception $e) {
                     $modx->log(modX::LOG_LEVEL_ERROR, '[AWSS3MediaSource] Error: ' . $e->getMessage());
