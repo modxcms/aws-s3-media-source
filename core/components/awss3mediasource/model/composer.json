@@ -1,11 +1,30 @@
 {
   "require": {
-    "aws/aws-sdk-php": "^3.261",
-    "league/climate": "^3.8"
+    "aws/aws-sdk-php": "^3.269",
+    "league/climate": "^3.8",
+    "guzzlehttp/guzzle": "^7.8",
+    "guzzlehttp/promises": "^2.0.1",
+    "league/flysystem": "^2.5.0",
+    "league/flysystem-aws-s3-v3": "^2.5.0",
+    "studio-42/elfinder": "^2.1",
+    "league/glide": "^2.3"
   },
   "config": {
     "platform": {
       "php": "7.4"
     }
+  },
+  "autoload": {
+    "psr-4": {
+      "AwsS3Mediasource\\": "src/"
+    }
+  },
+  "scripts": {
+    "pre-autoload-dump": "Aws\\Script\\Composer\\Composer::removeUnusedServices"
+  },
+  "extra": {
+    "aws/aws-sdk-php": [
+      "S3"
+    ]
   }
 }

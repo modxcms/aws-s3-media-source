@@ -1,3 +1,7 @@
+### 2.1.0
+- Backport AWS Driver speedups from MODX Revo
+- Create a Fred driver for AWS Media Source
+
 ### 1.1.0
 - Add PHP 8 support
 - Upgrade Composer dependencies
